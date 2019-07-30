@@ -10,15 +10,34 @@ import (
 	"net"
 )
 
+func closedError(listener net.Listener) string {
+	return fmt.Sprintf(
+		"close tcp %s: use of closed network connection",
+		listener.Addr().String())
+}
+
 func (s *store) listen(listener net.Listener) error {
 	defer func() {
 		if err := listener.Close(); err != nil {
+			e := err.Error()
+			c := closedError(listener)
+			if s.IsShutdown() && e == c {
+				// This will happen when the store is closed.
+				return
+			}
 			s.log.Errorf("failed to close listener: %v", err)
 		}
 	}()
-	for {
+
+	for !s.IsShutdown() {
 		conn, err := listener.Accept()
 		if err != nil {
+			// If the server is shutdown then we do not need to throw an error, the error is
+			// almost certainly due to stuff being closed.
+			if s.IsShutdown() {
+				continue
+			}
+
 			s.log.Errorf("failed to accept connection: %v", err)
 			return err
 		}
@@ -52,6 +71,8 @@ func (s *store) listen(listener net.Listener) error {
 			}
 		}(conn)
 	}
+
+	return nil
 }
 
 func (s *store) serveConnection(reader io.Reader, writer io.Writer, log timber.Logger) error {
@@ -69,11 +90,20 @@ func (s *store) serveConnection(reader io.Reader, writer io.Writer, log timber.L
 			return err
 		}
 
+		var err error
+
 		switch msgType {
 		case wire.MsgHandshakeRequest:
 			log.Debugf("received handshake request from [%d]", binary.BigEndian.Uint64(body))
+			_, err = writer.Write((&wire.HandshakeResponse{
+				ID: s.id,
+			}).EncodeMessage())
 		default:
 			log.Errorf("received unknown message type [%v] with body: %s", msgType, string(body))
+		}
+
+		if err != nil {
+			log.Errorf("could not send response: %v", err)
 		}
 	}
 }

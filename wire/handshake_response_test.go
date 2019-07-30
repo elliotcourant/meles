@@ -1,7 +1,6 @@
 package wire_test
 
 import (
-	"github.com/elliotcourant/meles"
 	"github.com/elliotcourant/meles/wire"
 	"github.com/stretchr/testify/assert"
 	"testing"
@@ -10,11 +9,11 @@ import (
 func TestHandshakeResponse_EncodeDecode(t *testing.T) {
 	t.Run("simple", func(t *testing.T) {
 		original := wire.HandshakeResponse{
-			ID: meles.GetShortID(),
+			ID: 1231616,
 		}
 		encoded := original.Encode()
 		result := wire.HandshakeResponse{
-			ID: "",
+			ID: 0,
 		}
 		result.Decode(encoded)
 		assert.Equal(t, original, result)

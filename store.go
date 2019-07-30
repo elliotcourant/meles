@@ -11,10 +11,12 @@ import (
 	"net"
 	"sort"
 	"strconv"
+	"sync"
 	"time"
 )
 
 type Store interface {
+	Close()
 }
 
 type store struct {
@@ -24,6 +26,10 @@ type store struct {
 	node raft.Node
 	id   uint64
 	log  timber.Logger
+	addr string
+
+	shutdownSync sync.RWMutex
+	shutdown     bool
 }
 
 func NewStore(listener net.Listener, peers []string, directory string, join bool) Store {
@@ -65,6 +71,7 @@ func NewStore(listener net.Listener, peers []string, directory string, join bool
 		log:                        log,
 		proposeChannel:             make(chan *proposition),
 		configurationChangeChannel: make(chan raftpb.ConfChange),
+		addr:                       address,
 	}
 
 	go func(str *store, listener net.Listener) {
@@ -75,7 +82,7 @@ func NewStore(listener net.Listener, peers []string, directory string, join bool
 
 	str.checkPeers(peers)
 
-	return nil
+	return str
 }
 
 func startupCheck(directory string) (join bool, id uint64) {
@@ -112,7 +119,11 @@ func startupCheck(directory string) (join bool, id uint64) {
 }
 
 func (s *store) checkPeers(peers []string) []raft.Peer {
+	neighbors := make([]raft.Peer, 0)
 	for _, peer := range peers {
+		if peer == s.addr {
+			continue
+		}
 		peer, err := resolveAddress(peer)
 		if err != nil {
 			s.log.Errorf("could not parse peer address [%s]: %v", peer, err)
@@ -144,13 +155,31 @@ func (s *store) checkPeers(peers []string) []raft.Peer {
 
 		peerDriver := driver.NewDriver(conn, log)
 
+		log.Debugf("trying to shake hands with peer")
+
 		// Send the handshake to the peer to get their ID.
 		handshakeResponse, err := peerDriver.Handshake(s.id)
 		if err != nil {
 			log.Errorf("could not shake hands with peer: %v", err)
 		}
 
-		log.Infof("greeted peer with ID [%s]", handshakeResponse.ID)
+		log.Infof("greeted peer with ID [%d]", handshakeResponse.ID)
+
+		neighbors = append(neighbors, raft.Peer{
+			ID: handshakeResponse.ID,
+		})
 	}
-	return nil
+	return neighbors
+}
+
+func (s *store) Close() {
+	s.shutdownSync.Lock()
+	defer s.shutdownSync.Unlock()
+	s.shutdown = true
+}
+
+func (s *store) IsShutdown() bool {
+	s.shutdownSync.RLock()
+	defer s.shutdownSync.RUnlock()
+	return s.shutdown
 }

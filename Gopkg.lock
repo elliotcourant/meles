@@ -57,11 +57,11 @@
   version = "v1.0.0"
 
 [[projects]]
-  digest = "1:9dc554b27f2f1589346b7a92f06d312a5911ed0380e4775ef2fed10d46999d61"
+  digest = "1:75e914e71b81fb867f610a8149083f0721ee52e1c097d2d0b023a845b4010d54"
   name = "github.com/elliotcourant/timber"
   packages = ["."]
   pruneopts = "UT"
-  revision = "e62abc274454b6c5e75cb72b39c97897c156c0c0"
+  revision = "25a1a8d91307063f099b2db6de876faf1b6f2d6a"
 
 [[projects]]
   digest = "1:4652941215f23c7ad6546bab86964c72248a1134baa53f0df618661344ba5cac"

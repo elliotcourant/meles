@@ -52,7 +52,11 @@ func TestNewStore(t *testing.T) {
 			}(i)
 		}
 
-		time.Sleep(30 * time.Second)
+		time.Sleep(5 * time.Second)
+
+		for i := 0; i < numberOfStores; i++ {
+			stores[i].Close()
+		}
 
 		assert.NotEmpty(t, stores)
 	})

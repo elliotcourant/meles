@@ -5,12 +5,12 @@ import (
 )
 
 type HandshakeResponse struct {
-	ID string
+	ID uint64
 }
 
 func (item *HandshakeResponse) Encode() []byte {
 	buf := buffers.NewBytesBuffer()
-	buf.AppendString(item.ID)
+	buf.AppendUint64(item.ID)
 	return buf.Bytes()
 }
 
@@ -24,5 +24,5 @@ func (item *HandshakeResponse) EncodeMessage() []byte {
 func (item *HandshakeResponse) Decode(src []byte) {
 	*item = HandshakeResponse{}
 	buf := buffers.NewBytesReader(src)
-	item.ID = buf.NextString()
+	item.ID = buf.NextUint64()
 }
