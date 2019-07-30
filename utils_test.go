@@ -1,4 +1,4 @@
-package testutils
+package meles
 
 import (
 	"github.com/stretchr/testify/assert"

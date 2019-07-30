@@ -14,6 +14,7 @@ const (
 type BytesBuffer interface {
 	Append(bytes ...byte)
 	AppendString(str string)
+	AppendUint8(item uint8)
 	AppendUint16(item uint16)
 	AppendUint32(item uint32)
 	AppendUint64(item uint64)
@@ -42,12 +43,16 @@ func (b *bytesBuffer) AppendBuffer(buffer BytesBuffer) {
 }
 
 func (b *bytesBuffer) Append(bytes ...byte) {
-	b.AppendInt32(int32(len(bytes)))
+	b.AppendUint32(uint32(len(bytes)))
 	b.buf = append(b.buf, bytes...)
 }
 
 func (b *bytesBuffer) AppendString(str string) {
 	b.Append([]byte(str)...)
+}
+
+func (b *bytesBuffer) AppendUint8(item uint8) {
+	b.buf = append(b.buf, item)
 }
 
 func (b *bytesBuffer) AppendUint16(item uint16) {
@@ -83,9 +88,9 @@ func (b *bytesBuffer) AppendInt64(item int64) {
 func (b *bytesBuffer) AppendBool(item bool) {
 	switch item {
 	case true:
-		b.AppendUint16(1)
+		b.AppendUint8(1)
 	default:
-		b.AppendUint16(0)
+		b.AppendUint8(0)
 	}
 }
 

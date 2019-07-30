@@ -10,6 +10,14 @@
   revision = "e2d15f34fcf99d5dbb871c820ec73f710fca9815"
 
 [[projects]]
+  digest = "1:31bd9d70492aec37a6bf45a42e96ed0f37fab74aa619d539b5acb9477500eb79"
+  name = "github.com/ahmetb/go-linq"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "b1b02a14bd27fab06f03ca1e4eed893f5011c152"
+  version = "v3.1.0"
+
+[[projects]]
   digest = "1:ffe9824d294da03b391f44e1ae8281281b4afc1bdaa9588c9097785e3af10cec"
   name = "github.com/davecgh/go-spew"
   packages = ["spew"]
@@ -49,11 +57,11 @@
   version = "v1.0.0"
 
 [[projects]]
-  digest = "1:7cd419fbd8dce1828f8f4cbbe9c548e9cf5063609ddb91cdfaffa5e33d5086ae"
+  digest = "1:9dc554b27f2f1589346b7a92f06d312a5911ed0380e4775ef2fed10d46999d61"
   name = "github.com/elliotcourant/timber"
   packages = ["."]
   pruneopts = "UT"
-  revision = "aee2fa967aab0adf51fbc84b43447fe37c9b6b3d"
+  revision = "e62abc274454b6c5e75cb72b39c97897c156c0c0"
 
 [[projects]]
   digest = "1:4652941215f23c7ad6546bab86964c72248a1134baa53f0df618661344ba5cac"
@@ -74,6 +82,14 @@
   pruneopts = "UT"
   revision = "6c65a5562fc06764971b7c5d05c76c75e84bdbf7"
   version = "v1.3.2"
+
+[[projects]]
+  digest = "1:f8ba338cbfe372d97422ada65947345fe87a2c45f9549eced9350aa59a97c940"
+  name = "github.com/kataras/go-errors"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "d2aaffdebcb40c69c4cb6a95e436430cde192435"
+  version = "v0.0.3"
 
 [[projects]]
   digest = "1:ba852707958e39694e7f64328008287892adf9b1aed0174480e2f50e0c23e521"
@@ -191,8 +207,10 @@
   analyzer-name = "dep"
   analyzer-version = 1
   input-imports = [
+    "github.com/ahmetb/go-linq",
     "github.com/dgraph-io/badger",
     "github.com/elliotcourant/timber",
+    "github.com/kataras/go-errors",
     "github.com/stretchr/testify/assert",
     "github.com/teris-io/shortid",
     "go.etcd.io/etcd/raft",
