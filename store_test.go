@@ -45,19 +45,20 @@ func TestNewStore(t *testing.T) {
 			}
 		}()
 
-		stores := make([]Store, numberOfStores)
+		s := make(chan Store, numberOfStores)
 		for i := 0; i < numberOfStores; i++ {
 			go func(i int) {
-				stores[i] = NewStore(listeners[i], peers, dirs[i], true)
+				s <- NewStore(listeners[i], peers, dirs[i], true)
 			}(i)
 		}
 
 		time.Sleep(5 * time.Second)
 
-		for i := 0; i < numberOfStores; i++ {
-			stores[i].Close()
-		}
+		assert.NotEmpty(t, s)
 
-		assert.NotEmpty(t, stores)
+		for i := 0; i < numberOfStores; i++ {
+			str := <-s
+			str.Close()
+		}
 	})
 }
