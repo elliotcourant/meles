@@ -1,0 +1,11 @@
+language: go
+
+go:
+  - "1.12"
+
+install:
+  - apt-get install go-dep
+  - dep ensure
+
+script:
+  - go test -v -race ./...
