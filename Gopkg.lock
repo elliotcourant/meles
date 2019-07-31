@@ -57,11 +57,11 @@
   version = "v1.0.0"
 
 [[projects]]
-  digest = "1:75e914e71b81fb867f610a8149083f0721ee52e1c097d2d0b023a845b4010d54"
+  digest = "1:5c4c189a270c4b25c8461978ad1955975505754ad55fefa7757e5edd9d7af3d8"
   name = "github.com/elliotcourant/timber"
   packages = ["."]
   pruneopts = "UT"
-  revision = "25a1a8d91307063f099b2db6de876faf1b6f2d6a"
+  revision = "91cde34fccfb2336bd40a8e0d8f41c9d6aace9ce"
 
 [[projects]]
   digest = "1:4652941215f23c7ad6546bab86964c72248a1134baa53f0df618661344ba5cac"
@@ -138,9 +138,12 @@
   version = "v1.0.0"
 
 [[projects]]
-  digest = "1:972c2427413d41a1e06ca4897e8528e5a1622894050e2f527b38ddf0f343f759"
+  digest = "1:5da8ce674952566deae4dbc23d07c85caafc6cfa815b0b3e03e41979cedb8750"
   name = "github.com/stretchr/testify"
-  packages = ["assert"]
+  packages = [
+    "assert",
+    "require",
+  ]
   pruneopts = "UT"
   revision = "ffdc059bfe9ce6a4e144ba849dbedead332c6053"
   version = "v1.3.0"
@@ -210,11 +213,15 @@
     "github.com/ahmetb/go-linq",
     "github.com/dgraph-io/badger",
     "github.com/elliotcourant/timber",
+    "github.com/gogo/protobuf/proto",
     "github.com/kataras/go-errors",
+    "github.com/pkg/errors",
     "github.com/stretchr/testify/assert",
+    "github.com/stretchr/testify/require",
     "github.com/teris-io/shortid",
     "go.etcd.io/etcd/raft",
     "go.etcd.io/etcd/raft/raftpb",
+    "golang.org/x/net/trace",
   ]
   solver-name = "gps-cdcl"
   solver-version = 1

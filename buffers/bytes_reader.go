@@ -16,6 +16,7 @@ type BytesReader interface {
 	NextUint16() uint16
 	NextUint32() uint32
 	NextUint64() uint64
+	NextBool() bool
 }
 
 func NewBytesReader(src []byte) BytesReader {
@@ -65,6 +66,11 @@ func (b *bytesReader) NextInt64() int64 {
 
 func (b *bytesReader) NextUint8() uint8 {
 	return b.NextByte()
+}
+
+func (b *bytesReader) NextBool() bool {
+	t := b.NextByte()
+	return t == 1
 }
 
 func (b *bytesReader) NextUint16() uint16 {

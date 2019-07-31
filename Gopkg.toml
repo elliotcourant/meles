@@ -39,7 +39,7 @@
 
 [[constraint]]
   name = "github.com/elliotcourant/timber"
-  revision = "25a1a8d91307063f099b2db6de876faf1b6f2d6a"
+  revision = "91cde34fccfb2336bd40a8e0d8f41c9d6aace9ce"
 
 [[constraint]]
   name = "go.etcd.io/etcd"

@@ -1,7 +1,6 @@
 package meles
 
 import (
-	"encoding/binary"
 	"github.com/ahmetb/go-linq"
 	"github.com/dgraph-io/badger"
 	"github.com/elliotcourant/meles/driver"
@@ -20,13 +19,17 @@ type Store interface {
 }
 
 type store struct {
+	db *badger.DB
+
 	proposeChannel             <-chan *proposition
 	configurationChangeChannel <-chan raftpb.ConfChange
 
-	node raft.Node
-	id   uint64
-	log  timber.Logger
-	addr string
+	node    raft.Node
+	config  *raft.Config
+	storage raft.Storage
+	id      uint64
+	log     timber.Logger
+	addr    string
 
 	shutdownSync sync.RWMutex
 	shutdown     bool
@@ -74,6 +77,27 @@ func NewStore(listener net.Listener, peers []string, directory string, join bool
 		addr:                       address,
 	}
 
+	options := badger.DefaultOptions(directory)
+	options.Logger = log.With(timber.Keys{}).SetDepth(1)
+	db, err := badger.Open(options)
+	if err != nil {
+		panic(err)
+	}
+
+	c := &raft.Config{
+		ID:                        id,
+		ElectionTick:              10,
+		HeartbeatTick:             1,
+		Storage:                   nil,
+		MaxSizePerMsg:             1024 * 1024,
+		MaxInflightMsgs:           256,
+		MaxUncommittedEntriesSize: 1 << 30,
+	}
+
+	str.config = c
+
+	str.storage = Init(db, id, 0, log)
+
 	go func(str *store, listener net.Listener) {
 		if err := str.listen(listener); err != nil {
 			str.log.Errorf("failed to listen: %v", err)
@@ -95,27 +119,8 @@ func startupCheck(directory string) (join bool, id uint64) {
 
 	defer db.Close()
 
-	var nodeId []byte
-	if err := db.View(func(txn *badger.Txn) error {
-		item, err := txn.Get(InternalItem_NodeID.GetPath())
-		if err == badger.ErrKeyNotFound {
-			return nil
-		} else if err != nil {
-			panic(err)
-		}
-		if _, err := item.ValueCopy(nodeId); err != nil {
-			panic(err)
-		}
-		return nil
-	}); err != nil {
-		panic(err)
-	}
-
-	if len(nodeId) == 0 {
-		return true, 0
-	}
-
-	return false, binary.BigEndian.Uint64(nodeId)
+	id, _ = RaftId(db)
+	return id == 0, id
 }
 
 func (s *store) checkPeers(peers []string) []raft.Peer {
