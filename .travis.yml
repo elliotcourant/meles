@@ -4,6 +4,7 @@ go:
   - "1.12"
 
 install:
+  - sudo apt-get update
   - sudo apt-get install go-dep
   - dep ensure
 
