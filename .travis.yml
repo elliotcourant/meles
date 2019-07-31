@@ -4,7 +4,7 @@ go:
   - "1.12"
 
 install:
-  - apt-get install go-dep
+  - sudo apt-get install go-dep
   - dep ensure
 
 script:
