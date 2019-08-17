@@ -11,11 +11,11 @@ type incrementSequence struct {
 	barge     barge
 	objSeq    *incrementSequenceStorage
 	key       []byte
-	leased    uint8
-	bandwidth uint8
+	leased    uint64
+	bandwidth uint64
 }
 
-func (r *boat) GetObjectSequence(key []byte, bandwidth uint8) (*incrementSequence, error) {
+func (r *boat) GetObjectSequence(key []byte, bandwidth uint64) (*incrementSequence, error) {
 	switch {
 	case len(key) == 0:
 		return nil, badger.ErrEmptyKey
@@ -74,7 +74,7 @@ func (s *incrementSequence) updateLease() error {
 	return nil
 }
 
-func (s *incrementSequence) Next() (uint8, error) {
+func (s *incrementSequence) Next() (uint64, error) {
 	s.Lock()
 	defer s.Unlock()
 	if s.objSeq.Next >= s.leased {

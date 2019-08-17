@@ -6,7 +6,7 @@ import (
 
 type incrementSequenceStorage struct {
 	Key  []byte
-	Next uint8
+	Next uint64
 }
 
 func (i incrementSequenceStorage) Path() []byte {
@@ -15,13 +15,13 @@ func (i incrementSequenceStorage) Path() []byte {
 
 func (i incrementSequenceStorage) Encode() []byte {
 	buf := buffers.NewBytesBuffer()
-	buf.AppendUint8(i.Next)
+	buf.AppendUint64(i.Next)
 	return buf.Bytes()
 }
 
 func (i *incrementSequenceStorage) Decode(src []byte) error {
 	*i = incrementSequenceStorage{}
 	buf := buffers.NewBytesReader(src)
-	i.Next = buf.NextUint8()
+	i.Next = buf.NextUint64()
 	return nil
 }

@@ -189,8 +189,8 @@ func (r *serverWireBase) Receive() (clientMessage, error) {
 		msg = &discoveryRequest{}
 	case msgApplyTransactionRequest:
 		msg = &applyTransactionRequest{}
-	case msgNextObjectIdRequest:
-		msg = &nextObjectIdRequest{}
+	case msgIncrementRequest:
+		msg = &incrementRequest{}
 	case msgJoinRequest:
 		msg = &joinRequest{}
 
@@ -285,8 +285,8 @@ func (r *clientWireBase) Receive() (serverMessage, error) {
 		msg = &discoveryResponse{}
 	case msgApplyTransactionResponse:
 		msg = &applyTransactionResponse{}
-	case msgNextObjectIdResponse:
-		msg = &nextObjectIdResponse{}
+	case msgIncrementResponse:
+		msg = &incrementResponse{}
 	case msgJoinResponse:
 		msg = &joinResponse{}
 

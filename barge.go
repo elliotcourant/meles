@@ -28,7 +28,7 @@ type barge interface {
 	Stop() error
 	IsStopped() bool
 	NodeID() raft.ServerID
-	NextObjectID(objectPath []byte) (uint8, error)
+	NextIncrementId(objectPath []byte) (uint64, error)
 }
 
 func (r *boat) Begin() (transaction, error) {
@@ -97,7 +97,7 @@ type transaction interface {
 
 	GetKeyIterator(prefix []byte, keyOnly bool, reverse bool) Iterator
 
-	NextObjectID(objectPath []byte) (uint8, error)
+	NextIncrementId(objectPath []byte) (uint64, error)
 
 	Rollback() error
 	Commit() error
@@ -116,8 +116,8 @@ func (t *transactionBase) Delete(key []byte) error {
 	return t.Set(key, nil)
 }
 
-func (t *transactionBase) NextObjectID(objectPath []byte) (uint8, error) {
-	return t.boat.NextObjectID(objectPath)
+func (t *transactionBase) NextIncrementId(objectPath []byte) (uint64, error) {
+	return t.boat.NextIncrementId(objectPath)
 }
 
 func (t *transactionBase) GetKeyIterator(prefix []byte, keyOnly bool, reverse bool) Iterator {

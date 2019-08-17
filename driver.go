@@ -8,7 +8,7 @@ import (
 
 type rpcDriver interface {
 	ApplyTransaction(tx transactionStorage) error
-	NextObjectID(objectPath []byte) (uint8, error)
+	NextObjectID(objectPath []byte) (uint64, error)
 	Discover() (*discoveryResponse, error)
 	Join() error
 	Close() error
@@ -47,8 +47,8 @@ func (r *rpcDriverBase) Join() error {
 	}
 }
 
-func (r *rpcDriverBase) NextObjectID(objectPath []byte) (uint8, error) {
-	if err := r.w.Send(&nextObjectIdRequest{
+func (r *rpcDriverBase) NextObjectID(objectPath []byte) (uint64, error) {
+	if err := r.w.Send(&incrementRequest{
 		ObjectPath: objectPath,
 	}); err != nil {
 		return 0, err
@@ -61,7 +61,7 @@ func (r *rpcDriverBase) NextObjectID(objectPath []byte) (uint8, error) {
 		}
 
 		switch msg := receivedMsg.(type) {
-		case *nextObjectIdResponse:
+		case *incrementResponse:
 			return msg.Identity, nil
 		case *errorResponse:
 			return 0, msg.Error

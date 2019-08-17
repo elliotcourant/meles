@@ -6,7 +6,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"sync"
 	"testing"
-	"time"
 )
 
 func TestBoat_GetObjectSequence(t *testing.T) {
@@ -29,18 +28,18 @@ func TestBoat_GetObjectSequence(t *testing.T) {
 		err = d.Start()
 		assert.NoError(t, err)
 
-		d.WaitForLeader(time.Second * 5)
+		VerifyLeader(t, d)
 
 		numberOfThreads := 4
 		numberOfIds := 30
-		ids := make(chan uint8, numberOfThreads*numberOfIds)
+		ids := make(chan uint64, numberOfThreads*numberOfIds)
 		var wg sync.WaitGroup
 		wg.Add(numberOfThreads)
 		for y := 0; y < numberOfThreads; y++ {
 			go func(d barge) {
 				defer wg.Done()
 				for x := 0; x < numberOfIds; x++ {
-					id, err := d.NextObjectID([]byte("table"))
+					id, err := d.NextIncrementId([]byte("table"))
 					assert.NoError(t, err)
 					ids <- id
 				}
@@ -48,7 +47,7 @@ func TestBoat_GetObjectSequence(t *testing.T) {
 		}
 		wg.Wait()
 		assert.NotEmpty(t, ids)
-		distinct := map[uint8]interface{}{}
+		distinct := map[uint64]interface{}{}
 		for i := 0; i < (numberOfThreads * numberOfIds); i++ {
 			id := <-ids
 			_, ok := distinct[id]
@@ -109,7 +108,7 @@ func TestBoat_GetObjectSequence(t *testing.T) {
 		// Make sure all of the nodes have the same leader
 		VerifyLeader(t, nodes...)
 
-		ids := make(chan uint8, numberOfNodes*numberOfIds)
+		ids := make(chan uint64, numberOfNodes*numberOfIds)
 
 		var wg sync.WaitGroup
 		wg.Add(numberOfNodes)
@@ -117,7 +116,7 @@ func TestBoat_GetObjectSequence(t *testing.T) {
 			go func(node barge) {
 				defer wg.Done()
 				for x := 0; x < numberOfIds; x++ {
-					id, err := node.NextObjectID([]byte("table"))
+					id, err := node.NextIncrementId([]byte("table"))
 					assert.NoError(t, err)
 					ids <- id
 				}
@@ -125,7 +124,7 @@ func TestBoat_GetObjectSequence(t *testing.T) {
 		}
 		wg.Wait()
 		assert.NotEmpty(t, ids)
-		distinct := map[uint8]interface{}{}
+		distinct := map[uint64]interface{}{}
 		for i := 0; i < (numberOfNodes * numberOfIds); i++ {
 			id := <-ids
 			_, ok := distinct[id]

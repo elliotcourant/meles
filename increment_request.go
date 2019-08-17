@@ -4,22 +4,22 @@ import (
 	"github.com/elliotcourant/buffers"
 )
 
-type nextObjectIdRequest struct {
+type incrementRequest struct {
 	ObjectPath []byte
 }
 
-func (nextObjectIdRequest) Client() {}
+func (incrementRequest) Client() {}
 
-func (nextObjectIdRequest) RPC() {}
+func (incrementRequest) RPC() {}
 
-func (i *nextObjectIdRequest) Encode() []byte {
+func (i *incrementRequest) Encode() []byte {
 	buf := buffers.NewBytesBuffer()
 	buf.Append(i.ObjectPath...)
 	return buf.Bytes()
 }
 
-func (i *nextObjectIdRequest) Decode(src []byte) error {
-	*i = nextObjectIdRequest{}
+func (i *incrementRequest) Decode(src []byte) error {
+	*i = incrementRequest{}
 	buf := buffers.NewBytesReader(src)
 	i.ObjectPath = buf.NextBytes()
 	return nil

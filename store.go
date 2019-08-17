@@ -275,32 +275,32 @@ func (r *boat) discoverPeers() (bool, string, error) {
 	return shouldJoin, shouldJoinAddr, nil
 }
 
-func (r *boat) NextObjectID(objectPath []byte) (uint8, error) {
+func (r *boat) NextIncrementId(incrementPath []byte) (uint64, error) {
 	leaderAddr, amLeader, err := r.waitForAmILeader(leaderWaitTimeout)
 	if err != nil {
 		return 0, fmt.Errorf("could not apply transactionBase: %v", err)
 	}
 	// If I am not the leader then we need to forward this request to the leader.
 	if !amLeader {
-		r.logger.Verbosef("redirecting object identity request to leader [%s]", leaderAddr)
+		r.logger.Verbosef("redirecting increment request to leader [%s]", leaderAddr)
 		c, err := r.newRpcConnectionTo(leaderAddr)
 		if err != nil {
 			return 0, err
 		}
 		defer c.Close()
-		return c.NextObjectID(objectPath)
+		return c.NextObjectID(incrementPath)
 	}
 
 	r.objectSequencesSync.Lock()
 	defer r.objectSequencesSync.Unlock()
 
-	seq, ok := r.objectSequences[string(objectPath)]
+	seq, ok := r.objectSequences[string(incrementPath)]
 	if !ok {
-		seq, err = r.GetObjectSequence(objectPath, 10)
+		seq, err = r.GetObjectSequence(incrementPath, 10)
 		if err != nil {
 			return 0, err
 		}
-		r.objectSequences[string(objectPath)] = seq
+		r.objectSequences[string(incrementPath)] = seq
 	}
 
 	return seq.Next()
