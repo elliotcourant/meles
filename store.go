@@ -34,28 +34,141 @@ func (n nodeId) RaftID() raft.ServerID {
 
 type distOptions struct {
 	Directory       string
-	ListenAddress   string
 	Peers           []string
-	Join            bool
 	LeaderWaitDelay time.Duration
 }
 
 type boat struct {
-	id       raft.ServerID
-	nodeId   nodeId
-	newNode  bool
-	db       *badger.DB
-	options  *distOptions
-	logger   timber.Logger
-	raftSync sync.RWMutex
-	raft     *raft.Raft
-	ln       transportWrapper
+	id            raft.ServerID
+	nodeId        nodeId
+	newNode       bool
+	listenAddress string
+	db            *badger.DB
+	options       *distOptions
+	logger        timber.Logger
+	raftSync      sync.RWMutex
+	raft          *raft.Raft
+	ln            transportWrapper
 
 	closed     bool
 	closedSync sync.RWMutex
 
 	objectSequences     map[string]*incrementSequence
 	objectSequencesSync sync.Mutex
+}
+
+func newDistributor(listener net.Listener, options *distOptions, l timber.Logger) (barge, error) {
+	ln := newTransportWrapperFromListener(listener)
+	addr, err := network.ResolveAddress(ln.Addr().String())
+	if err != nil {
+		return nil, err
+	}
+	dbOptions := badger.DefaultOptions(options.Directory)
+	dbOptions.Logger = logger.NewBadgerLogger(l)
+	db, err := badger.Open(dbOptions)
+	if err != nil {
+		return nil, err
+	}
+	return &boat{
+		options:         options,
+		db:              db,
+		logger:          l,
+		ln:              ln,
+		listenAddress:   addr,
+		objectSequences: map[string]*incrementSequence{},
+	}, nil
+}
+
+func (r *boat) Start() error {
+	r.runMasterServer()
+	r.runBoatServer()
+	nodeId, peerNodes, join, err := r.determineNodeId()
+	if err != nil {
+		return err
+	}
+
+	r.nodeId = nodeId
+
+	r.logger = r.logger.Prefix(fmt.Sprintf("%s", nodeId.RaftID()))
+
+	r.logger.Infof("starting node at address [%s]", r.listenAddress)
+
+	raftTransport := newMelesTransportWithLogger(
+		r.ln.RaftTransport(),
+		4,
+		time.Second*5,
+		r.logger)
+
+	config := &raft.Config{
+		ProtocolVersion:    raft.ProtocolVersionMax,
+		HeartbeatTimeout:   time.Millisecond * 500,
+		ElectionTimeout:    time.Millisecond * 500,
+		CommitTimeout:      time.Millisecond * 500,
+		MaxAppendEntries:   64,
+		ShutdownOnRemove:   true,
+		TrailingLogs:       128,
+		SnapshotInterval:   time.Minute * 5,
+		SnapshotThreshold:  512,
+		LeaderLeaseTimeout: time.Millisecond * 500,
+		LocalID:            nodeId.RaftID(),
+		NotifyCh:           nil,
+		Logger:             logger.NewLogger(string(nodeId.RaftID())),
+	}
+
+	r.ln.SetNodeID(config.LocalID)
+
+	snapshots, err := raft.NewFileSnapshotStore(r.options.Directory, 8, os.Stderr)
+	if err != nil {
+		return fmt.Errorf("could not create snapshot store: %v", err)
+	}
+
+	stableStore := r.stableStore()
+
+	raftLog, err := raft.NewLogCache(64, r.logStore())
+	if err != nil {
+		return fmt.Errorf("could not create raft log store: %v", err)
+	}
+
+	rft, err := raft.NewRaft(
+		config,
+		r.fsmStore(),
+		raftLog,
+		stableStore,
+		snapshots,
+		raftTransport)
+	if err != nil {
+		return err
+	}
+	r.raftSync.Lock()
+	r.raft = rft
+	r.raftSync.Unlock()
+	if len(r.options.Peers) == 1 && !join {
+		r.logger.Infof("bootstrapping")
+		configuration := raft.Configuration{
+			Servers: []raft.Server{
+				{
+					ID:      config.LocalID,
+					Address: raftTransport.LocalAddr(),
+				},
+			},
+		}
+		r.raft.BootstrapCluster(configuration)
+	} else if len(r.options.Peers) > 1 && !join {
+		r.logger.Infof("bootstrapping")
+		configuration := raft.Configuration{
+			Servers: peerNodes,
+		}
+		bootstrapResult := r.raft.BootstrapCluster(configuration)
+		if err := bootstrapResult.Error(); err != nil {
+			r.logger.Errorf("failed to bootstrap: %v", err)
+		} else {
+			r.logger.Infof("successfully bootstrapped node")
+		}
+	}
+	r.logger.Info("raft started")
+	r.newNode = false
+	r.id = config.LocalID
+	return nil
 }
 
 func (r *boat) NextObjectID(objectPath []byte) (uint8, error) {
@@ -109,120 +222,6 @@ func (r *boat) Stop() error {
 	}
 	r.ln.Close()
 	r.db.Close()
-	return nil
-}
-
-func newDistributor(listener net.Listener, options *distOptions, l timber.Logger) (barge, error) {
-	ln := newTransportWrapperFromListener(listener)
-	addr, err := network.ResolveAddress(ln.Addr().String())
-	if err != nil {
-		return nil, err
-	}
-	options.ListenAddress = addr
-	dbOptions := badger.DefaultOptions(options.Directory)
-	dbOptions.Logger = logger.NewBadgerLogger(l)
-	db, err := badger.Open(dbOptions)
-	if err != nil {
-		return nil, err
-	}
-	return &boat{
-		options:         options,
-		db:              db,
-		logger:          l,
-		ln:              ln,
-		objectSequences: map[string]*incrementSequence{},
-	}, nil
-}
-
-func (r *boat) Start() error {
-	r.runMasterServer()
-	r.runBoatServer()
-	nodeId, peerNodes, newNode, err := r.determineNodeId()
-	if err != nil {
-		return err
-	}
-
-	r.nodeId, r.newNode = nodeId, newNode
-
-	r.logger = r.logger.Prefix(fmt.Sprintf("%s", nodeId.RaftID()))
-
-	r.logger.Infof("starting node at address [%s]", r.options.ListenAddress)
-
-	raftTransport := newMelesTransportWithLogger(
-		r.ln.RaftTransport(),
-		4,
-		time.Second*5,
-		r.logger)
-
-	config := &raft.Config{
-		ProtocolVersion:    raft.ProtocolVersionMax,
-		HeartbeatTimeout:   time.Millisecond * 500,
-		ElectionTimeout:    time.Millisecond * 500,
-		CommitTimeout:      time.Millisecond * 500,
-		MaxAppendEntries:   64,
-		ShutdownOnRemove:   true,
-		TrailingLogs:       128,
-		SnapshotInterval:   time.Minute * 5,
-		SnapshotThreshold:  512,
-		LeaderLeaseTimeout: time.Millisecond * 500,
-		LocalID:            nodeId.RaftID(),
-		NotifyCh:           nil,
-		Logger:             logger.NewLogger(string(nodeId.RaftID())),
-	}
-
-	r.ln.SetNodeID(config.LocalID)
-
-	snapshots, err := raft.NewFileSnapshotStore(r.options.Directory, 8, os.Stderr)
-	if err != nil {
-		return fmt.Errorf("could not create snapshot store: %v", err)
-	}
-
-	stableStore := r.stableStore()
-
-	raftLog, err := raft.NewLogCache(64, r.logStore())
-	if err != nil {
-		return fmt.Errorf("could not create raft log store: %v", err)
-	}
-
-	rft, err := raft.NewRaft(
-		config,
-		r.fsmStore(),
-		raftLog,
-		stableStore,
-		snapshots,
-		raftTransport)
-	if err != nil {
-		return err
-	}
-	r.raftSync.Lock()
-	r.raft = rft
-	r.raftSync.Unlock()
-	if len(r.options.Peers) == 1 && newNode && !r.options.Join {
-		r.logger.Infof("bootstrapping")
-		configuration := raft.Configuration{
-			Servers: []raft.Server{
-				{
-					ID:      config.LocalID,
-					Address: raftTransport.LocalAddr(),
-				},
-			},
-		}
-		r.raft.BootstrapCluster(configuration)
-	} else if len(r.options.Peers) > 1 && newNode && !r.options.Join {
-		r.logger.Infof("bootstrapping")
-		configuration := raft.Configuration{
-			Servers: peerNodes,
-		}
-		bootstrapResult := r.raft.BootstrapCluster(configuration)
-		if err := bootstrapResult.Error(); err != nil {
-			r.logger.Errorf("failed to bootstrap: %v", err)
-		} else {
-			r.logger.Infof("successfully bootstrapped node")
-		}
-	}
-	r.logger.Info("raft started")
-	r.newNode = false
-	r.id = config.LocalID
 	return nil
 }
 
@@ -357,7 +356,7 @@ func (r *boat) runBoatServer() {
 	bs.runBoatServer()
 }
 
-func (r *boat) determineNodeId() (id nodeId, servers []raft.Server, newNode bool, err error) {
+func (r *boat) determineNodeId() (id nodeId, servers []raft.Server, join bool, err error) {
 	var val []byte
 	if err := r.db.View(func(txn *badger.Txn) error {
 		item, err := txn.Get(getMyNodeIdPath())
@@ -370,7 +369,7 @@ func (r *boat) determineNodeId() (id nodeId, servers []raft.Server, newNode bool
 		_, err = item.ValueCopy(val)
 		return err
 	}); err != nil {
-		return 0, nil, true, err
+		return 0, nil, false, err
 	}
 
 	if len(val) == 8 {
@@ -378,48 +377,36 @@ func (r *boat) determineNodeId() (id nodeId, servers []raft.Server, newNode bool
 		return id, nil, false, nil
 	}
 
-	// If we are joining a cluster we should reach out to each one of
-	// the peers provided and try to see what state it is in. If we
-	// find a peer that is part of a cluster then we want to get its'
-	// leader and do a join request. But if we find two different
-	// leader addresses in the discovery phase then we want to panic
-	// because that indicates a split-brain scenario or that there
-	// are multiple established clusters currently active and we
-	// cannot determine which cluster we should join.
-	if r.options.Join {
-		return 0, nil, true, fmt.Errorf("join not yet supported")
-	} else {
-		myParsedAddress, err := network.ResolveAddress(r.options.ListenAddress)
-		if err != nil {
-			return 0, nil, true, err
-		}
-		peers := make([]string, len(r.options.Peers))
-		for i, peer := range r.options.Peers {
-			addr, err := network.ResolveAddress(peer)
-			if err != nil {
-				return 0, nil, true, err
-			}
-			peers[i] = addr
-		}
-		peers = append(peers, myParsedAddress)
-
-		linq.From(peers).Distinct().ToSlice(&peers)
-
-		sort.Strings(peers)
-
-		servers := make([]raft.Server, len(peers))
-		for i, peer := range peers {
-			servers[i] = raft.Server{
-				ID:       raft.ServerID(fmt.Sprintf("%d", i+1)),
-				Address:  raft.ServerAddress(peer),
-				Suffrage: raft.Voter,
-			}
-		}
-
-		id = nodeId(linq.From(peers).IndexOf(func(i interface{}) bool {
-			addr, ok := i.(string)
-			return ok && addr == myParsedAddress
-		}) + 1)
-		return id, servers, true, nil
+	myParsedAddress, err := network.ResolveAddress(r.listenAddress)
+	if err != nil {
+		return 0, nil, false, err
 	}
+	peers := make([]string, len(r.options.Peers))
+	for i, peer := range r.options.Peers {
+		addr, err := network.ResolveAddress(peer)
+		if err != nil {
+			return 0, nil, false, err
+		}
+		peers[i] = addr
+	}
+	peers = append(peers, myParsedAddress)
+
+	linq.From(peers).Distinct().ToSlice(&peers)
+
+	sort.Strings(peers)
+
+	servers = make([]raft.Server, len(peers))
+	for i, peer := range peers {
+		servers[i] = raft.Server{
+			ID:       raft.ServerID(fmt.Sprintf("%d", i+1)),
+			Address:  raft.ServerAddress(peer),
+			Suffrage: raft.Voter,
+		}
+	}
+
+	id = nodeId(linq.From(peers).IndexOf(func(i interface{}) bool {
+		addr, ok := i.(string)
+		return ok && addr == myParsedAddress
+	}) + 1)
+	return id, servers, false, nil
 }

@@ -45,10 +45,8 @@ func TestNewDistributor(t *testing.T) {
 
 		defer cleanup()
 		d, err := newDistributor(ln, &distOptions{
-			Directory:     tempDir,
-			ListenAddress: ln.Addr().String(),
-			Peers:         []string{ln.Addr().String()},
-			Join:          false,
+			Directory: tempDir,
+			Peers:     []string{ln.Addr().String()},
 		}, timber.With(timber.Keys{
 			"test": t.Name(),
 		}))
@@ -82,10 +80,8 @@ func TestNewDistributor(t *testing.T) {
 				cleanups[i] = cleanup
 
 				d, err := newDistributor(listeners[i], &distOptions{
-					Directory:     tempDir,
-					ListenAddress: listeners[i].Addr().String(),
-					Peers:         peers,
-					Join:          false,
+					Directory: tempDir,
+					Peers:     peers,
 				}, timber.With(timber.Keys{
 					"test": t.Name(),
 				}))
@@ -136,10 +132,8 @@ func TestNewDistributor(t *testing.T) {
 				cleanups[i] = cleanup
 
 				d, err := newDistributor(listeners[i], &distOptions{
-					Directory:     tempDir,
-					ListenAddress: listeners[i].Addr().String(),
-					Peers:         peers,
-					Join:          false,
+					Directory: tempDir,
+					Peers:     peers,
 				}, timber.With(timber.Keys{
 					"test": t.Name(),
 				}))
@@ -204,10 +198,8 @@ func TestNewDistributor(t *testing.T) {
 
 		defer cleanup()
 		d, err := newDistributor(ln, &distOptions{
-			Directory:     tempDir,
-			ListenAddress: ln.Addr().String(),
-			Peers:         []string{ln.Addr().String()},
-			Join:          false,
+			Directory: tempDir,
+			Peers:     []string{ln.Addr().String()},
 		}, timber.With(timber.Keys{
 			"test": t.Name(),
 		}))
@@ -248,10 +240,8 @@ func TestNewDistributor(t *testing.T) {
 				cleanups[i] = cleanup
 
 				d, err := newDistributor(listeners[i], &distOptions{
-					Directory:     tempDir,
-					ListenAddress: listeners[i].Addr().String(),
-					Peers:         peers,
-					Join:          false,
+					Directory: tempDir,
+					Peers:     peers,
 				}, timber.With(timber.Keys{
 					"test": t.Name(),
 				}))
@@ -319,10 +309,8 @@ func TestNewDistributor(t *testing.T) {
 				cleanups[i] = cleanup
 
 				d, err := newDistributor(listeners[i], &distOptions{
-					Directory:     tempDir,
-					ListenAddress: listeners[i].Addr().String(),
-					Peers:         peers,
-					Join:          false,
+					Directory: tempDir,
+					Peers:     peers,
 				}, timber.With(timber.Keys{
 					"test": t.Name(),
 				}))

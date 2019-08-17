@@ -9,6 +9,7 @@ import (
 type rpcDriver interface {
 	ApplyTransaction(tx transactionStorage) error
 	NextObjectID(objectPath []byte) (uint8, error)
+	Discover() (*discoveryResponse, error)
 	Close() error
 }
 
@@ -64,6 +65,30 @@ func (r *rpcDriverBase) ApplyTransaction(tx transactionStorage) error {
 			return msg.Error
 		default:
 			return fmt.Errorf("expected apply transactionBase response, received [%T]", msg)
+		}
+	}
+}
+
+func (r *rpcDriverBase) Discover() (*discoveryResponse, error) {
+	if err := r.w.Send(&discoveryRequest{
+		NodeID: r.boat.nodeId.RaftID(),
+	}); err != nil {
+		return nil, err
+	}
+
+	for {
+		receivedMsg, err := r.w.Receive()
+		if err != nil {
+			return nil, err
+		}
+
+		switch msg := receivedMsg.(type) {
+		case *discoveryResponse:
+			return msg, nil
+		case *errorResponse:
+			return nil, msg.Error
+		default:
+			return nil, fmt.Errorf("expected discovery response, received [%T]", msg)
 		}
 	}
 }
