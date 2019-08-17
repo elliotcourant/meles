@@ -9,7 +9,7 @@ type log struct {
 	raft.Log
 }
 
-func NewLogFromRaft(l *raft.Log) *log {
+func newLogFromRaft(l *raft.Log) *log {
 	return &log{
 		Log: *l,
 	}

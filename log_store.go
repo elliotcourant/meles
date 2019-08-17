@@ -43,7 +43,7 @@ func (r *raftLogStore) StoreLog(log *raft.Log) error {
 func (r *raftLogStore) StoreLogs(logs []*raft.Log) error {
 	return r.db.Update(func(txn *badger.Txn) error {
 		for _, raftLog := range logs {
-			log := NewLogFromRaft(raftLog)
+			log := newLogFromRaft(raftLog)
 			if err := txn.Set(log.Path(), log.Encode()); err != nil {
 				return err
 			}
