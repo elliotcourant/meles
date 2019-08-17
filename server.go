@@ -140,11 +140,29 @@ func (i *boatServer) handleConn(conn net.Conn) error {
 					Identity: val,
 				})
 			case *identityRequest:
+				confFuture := i.boat.raft.GetConfiguration()
+				if err := confFuture.Error(); err != nil {
+					return err
+				}
+				maxId := uint64(len(confFuture.Configuration().Servers) + 1)
+
 				val, err := i.boat.NextIncrementId(getNodeIncrementNodeIdPath())
 				if err != nil {
 					return r.Send(&errorResponse{
 						Error: err,
 					})
+				}
+
+				if maxId > val {
+					for x := uint64(0); x < maxId; x++ {
+						val, err = i.boat.NextIncrementId(getNodeIncrementNodeIdPath())
+						if err != nil {
+							return err
+						}
+						if val > maxId {
+							break
+						}
+					}
 				}
 
 				return r.Send(&identityResponse{

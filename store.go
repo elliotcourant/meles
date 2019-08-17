@@ -208,33 +208,6 @@ func (r *boat) Start() error {
 				return err
 			}
 		}
-
-		// If we are enforcing numeric Ids then make sure to update
-		// the sequence.
-		if r.options.NumericNodeIds {
-			_, amLeader, err := r.waitForAmILeader(time.Second * 10)
-			if err != nil {
-				return err
-			}
-
-			if amLeader {
-				confFuture := r.raft.GetConfiguration()
-				if err := confFuture.Error(); err != nil {
-					return err
-				}
-				maxId := uint64(len(confFuture.Configuration().Servers))
-
-				for i := uint64(0); i < maxId; i++ {
-					id, err := r.NextIncrementId(getNodeIncrementNodeIdPath())
-					if err != nil {
-						return err
-					}
-					if id == maxId {
-						break
-					}
-				}
-			}
-		}
 	}
 
 	r.logger.Info("raft started")
