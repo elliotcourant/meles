@@ -12,6 +12,10 @@ func TestAppendEntriesRequest_Client(t *testing.T) {
 	appendEntriesRequest{}.Client()
 }
 
+func TestAppendEntriesRequest_Raft(t *testing.T) {
+	appendEntriesRequest{}.Raft()
+}
+
 func TestAppendEntriesRequest(t *testing.T) {
 	t.Run("encode and decode", func(t *testing.T) {
 		appendEntry := appendEntriesRequest{
