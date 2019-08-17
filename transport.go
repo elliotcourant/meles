@@ -520,7 +520,6 @@ func (p *melesTransport) getConn(target raft.ServerAddress) (*melesConn, error) 
 	// Dial a new connection
 	conn, err := p.stream.Dial(target, p.timeout)
 	if err != nil {
-		p.logger.Errorf("could not dial connection for [%v]: %v", target, err)
 		return nil, err
 	}
 
