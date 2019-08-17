@@ -3,8 +3,15 @@ language: go
 go:
   - "1.12"
 
-install:
-  - go get -u github.com/golang/dep/cmd/dep
+os:
+  - linux
+
+go_import_path: github.com/elliotcourant/meles
+
+install: true
+
+env:
+  - GO111MODULE=on
 
 script:
   - go test -v -race ./...
