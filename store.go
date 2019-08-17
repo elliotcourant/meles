@@ -16,6 +16,15 @@ import (
 	"time"
 )
 
+type storeState int
+
+const (
+	stateNone storeState = 0 << iota
+	stateCreated
+	stateStarting
+	stateEstablished
+)
+
 const (
 	leaderWaitDelay   = 50 * time.Millisecond
 	leaderWaitTimeout = 500 * time.Millisecond
@@ -36,12 +45,13 @@ type distOptions struct {
 	Directory       string
 	Peers           []string
 	LeaderWaitDelay time.Duration
+	NumericNodeIds  bool
 }
 
 type boat struct {
-	id            raft.ServerID
-	nodeId        nodeId
-	newNode       bool
+	id     raft.ServerID
+	nodeId nodeId
+
 	listenAddress string
 	db            *badger.DB
 	options       *distOptions
@@ -49,16 +59,24 @@ type boat struct {
 	raftSync      sync.RWMutex
 	raft          *raft.Raft
 	ln            transportWrapper
+	peers         []raft.Server
 
 	closed     bool
 	closedSync sync.RWMutex
 
 	objectSequences     map[string]*incrementSequence
 	objectSequencesSync sync.Mutex
+
+	peerPool map[raft.ServerAddress]sync.Pool
+	peerSync sync.Mutex
+
+	newNodeLock sync.Mutex
+	newNode     bool
 }
 
 func newDistributor(listener net.Listener, options *distOptions, l timber.Logger) (barge, error) {
-	ln := newTransportWrapperFromListener(listener)
+	options.NumericNodeIds = true
+	ln := newTransportWrapperFromListener(listener, l)
 	addr, err := network.ResolveAddress(ln.Addr().String())
 	if err != nil {
 		return nil, err
@@ -69,27 +87,29 @@ func newDistributor(listener net.Listener, options *distOptions, l timber.Logger
 	if err != nil {
 		return nil, err
 	}
-	return &boat{
+	r := &boat{
 		options:         options,
 		db:              db,
 		logger:          l,
 		ln:              ln,
 		listenAddress:   addr,
 		objectSequences: map[string]*incrementSequence{},
-	}, nil
+	}
+	r.nodeId, r.peers, r.newNode, err = r.determineNodeId()
+	return r, err
 }
 
 func (r *boat) Start() error {
 	r.runMasterServer()
 	r.runBoatServer()
-	nodeId, peerNodes, join, err := r.determineNodeId()
+
+	r.logger.Infof("trying to discover peers")
+	shouldJoin, shouldJoinAddr, err := r.discoverPeers()
 	if err != nil {
 		return err
 	}
 
-	r.nodeId = nodeId
-
-	r.logger = r.logger.Prefix(fmt.Sprintf("%s", nodeId.RaftID()))
+	r.logger.Prefix(fmt.Sprintf("%s", r.nodeId.RaftID()))
 
 	r.logger.Infof("starting node at address [%s]", r.listenAddress)
 
@@ -110,9 +130,9 @@ func (r *boat) Start() error {
 		SnapshotInterval:   time.Minute * 5,
 		SnapshotThreshold:  512,
 		LeaderLeaseTimeout: time.Millisecond * 500,
-		LocalID:            nodeId.RaftID(),
+		LocalID:            r.nodeId.RaftID(),
 		NotifyCh:           nil,
-		Logger:             logger.NewLogger(string(nodeId.RaftID())),
+		Logger:             logger.NewLogger(r.logger),
 	}
 
 	r.ln.SetNodeID(config.LocalID)
@@ -142,7 +162,7 @@ func (r *boat) Start() error {
 	r.raftSync.Lock()
 	r.raft = rft
 	r.raftSync.Unlock()
-	if len(r.options.Peers) == 1 && !join {
+	if len(r.options.Peers) == 1 && r.newNode && !shouldJoin {
 		r.logger.Infof("bootstrapping")
 		configuration := raft.Configuration{
 			Servers: []raft.Server{
@@ -153,10 +173,10 @@ func (r *boat) Start() error {
 			},
 		}
 		r.raft.BootstrapCluster(configuration)
-	} else if len(r.options.Peers) > 1 && !join {
+	} else if len(r.options.Peers) > 1 && r.newNode && !shouldJoin {
 		r.logger.Infof("bootstrapping")
 		configuration := raft.Configuration{
-			Servers: peerNodes,
+			Servers: r.peers,
 		}
 		bootstrapResult := r.raft.BootstrapCluster(configuration)
 		if err := bootstrapResult.Error(); err != nil {
@@ -164,11 +184,95 @@ func (r *boat) Start() error {
 		} else {
 			r.logger.Infof("successfully bootstrapped node")
 		}
+	} else if len(r.options.Peers) > 1 && shouldJoin && len(shouldJoinAddr) > 0 {
+		r.logger.Infof("attempting to join [%s]", shouldJoinAddr)
+		wire, err := r.newRpcConnectionTo(shouldJoinAddr)
+		if err != nil {
+			return fmt.Errorf("failed to join cluster: %v", err)
+		}
+		if err := wire.Join(); err != nil {
+			return err
+		}
 	}
 	r.logger.Info("raft started")
-	r.newNode = false
+	r.setNewNode(false)
 	r.id = config.LocalID
 	return nil
+}
+
+func (r *boat) setNewNode(val bool) {
+	r.newNodeLock.Lock()
+	defer r.newNodeLock.Unlock()
+	r.newNode = val
+}
+
+func (r *boat) getIsNewNode() bool {
+	r.newNodeLock.Lock()
+	r.raftSync.RLock()
+	defer r.newNodeLock.Unlock()
+	defer r.raftSync.RUnlock()
+	return r.newNode && r.raft == nil
+}
+
+// discoverPeers will return a boolean, string and error
+// the bool will be true if we should join a cluster
+// rather than bootstrapping a new one, and the string
+// will be the address where we should send the join request.
+func (r *boat) discoverPeers() (bool, string, error) {
+	peers := map[string]rpcDriver{}
+	maxRetries := 3
+	for _, peer := range r.peers {
+		if string(peer.Address) == r.listenAddress {
+			continue
+		}
+		retries := 0
+	RetryConnection:
+		wire, err := r.newRpcConnectionTo(string(peer.Address))
+		if err != nil {
+			if retries < maxRetries {
+				retries++
+				r.logger.Warningf("failed to connect to peer [%s] trying again: %v", peer.Address, err)
+				goto RetryConnection
+			}
+			return false, "", err
+		}
+		peers[string(peer.Address)] = wire
+	}
+
+	if len(peers) == 0 {
+		return false, "", nil
+	}
+
+	shouldJoin := false
+	shouldJoinAddr := ""
+	for addr, peer := range peers {
+		discovery, err := peer.Discover()
+		if err != nil {
+			r.logger.Warningf("could not discover peer [%s]: %v", addr, err)
+			continue
+		}
+
+		if len(discovery.Leader) > 0 {
+			if shouldJoin && shouldJoinAddr != string(discovery.Leader) {
+				r.logger.Errorf(
+					"peer [%s - %s] has leader [%s], but a leader has already been found [%s], using original leader",
+					discovery.NodeID,
+					addr,
+					discovery.Leader,
+					shouldJoinAddr)
+				return false, "", fmt.Errorf("multiple leaders found")
+			} else {
+				r.logger.Infof(
+					"peer [%s - %s] has leader [%s], setting join address",
+					discovery.NodeID,
+					addr,
+					discovery.Leader)
+				shouldJoin = true
+				shouldJoinAddr = string(discovery.Leader)
+			}
+		}
+	}
+	return shouldJoin, shouldJoinAddr, nil
 }
 
 func (r *boat) NextObjectID(objectPath []byte) (uint8, error) {
@@ -356,7 +460,11 @@ func (r *boat) runBoatServer() {
 	bs.runBoatServer()
 }
 
-func (r *boat) determineNodeId() (id nodeId, servers []raft.Server, join bool, err error) {
+func (r *boat) determineNodeId() (id nodeId, servers []raft.Server, newNode bool, err error) {
+	if !r.options.NumericNodeIds {
+		panic("non numeric node Ids are not yet supported")
+	}
+
 	var val []byte
 	if err := r.db.View(func(txn *badger.Txn) error {
 		item, err := txn.Get(getMyNodeIdPath())
@@ -369,7 +477,7 @@ func (r *boat) determineNodeId() (id nodeId, servers []raft.Server, join bool, e
 		_, err = item.ValueCopy(val)
 		return err
 	}); err != nil {
-		return 0, nil, false, err
+		return 0, nil, true, err
 	}
 
 	if len(val) == 8 {
@@ -379,13 +487,13 @@ func (r *boat) determineNodeId() (id nodeId, servers []raft.Server, join bool, e
 
 	myParsedAddress, err := network.ResolveAddress(r.listenAddress)
 	if err != nil {
-		return 0, nil, false, err
+		return 0, nil, true, err
 	}
 	peers := make([]string, len(r.options.Peers))
 	for i, peer := range r.options.Peers {
 		addr, err := network.ResolveAddress(peer)
 		if err != nil {
-			return 0, nil, false, err
+			return 0, nil, true, err
 		}
 		peers[i] = addr
 	}
@@ -408,5 +516,5 @@ func (r *boat) determineNodeId() (id nodeId, servers []raft.Server, join bool, e
 		addr, ok := i.(string)
 		return ok && addr == myParsedAddress
 	}) + 1)
-	return id, servers, false, nil
+	return id, servers, true, nil
 }

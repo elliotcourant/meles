@@ -363,4 +363,48 @@ func TestNewDistributor(t *testing.T) {
 			assert.Equal(t, value, readValue)
 		}
 	})
+
+	t.Run("join", func(t *testing.T) {
+		tempDir1, cleanup1 := testutils.NewTempDirectory(t)
+
+		ln1, err := newTransport(":")
+		assert.NoError(t, err)
+
+		defer cleanup1()
+		d1, err := newDistributor(ln1, &distOptions{
+			Directory: tempDir1,
+			Peers:     []string{ln1.Addr().String()},
+		}, timber.With(timber.Keys{
+			"test": t.Name(),
+		}))
+		assert.NoError(t, err)
+		assert.NotNil(t, d1)
+
+		err = d1.Start()
+		assert.NoError(t, err)
+
+		time.Sleep(time.Second * 5)
+
+		tempDir2, cleanup2 := testutils.NewTempDirectory(t)
+
+		ln2, err := newTransport(":")
+		assert.NoError(t, err)
+
+		defer cleanup2()
+		d2, err := newDistributor(ln2, &distOptions{
+			Directory: tempDir2,
+			Peers:     []string{ln1.Addr().String(), ln2.Addr().String()},
+		}, timber.With(timber.Keys{
+			"test": t.Name(),
+		}))
+		assert.NoError(t, err)
+		assert.NotNil(t, d1)
+
+		err = d2.Start()
+		assert.NoError(t, err)
+
+		time.Sleep(time.Second * 5)
+
+		VerifyLeader(t, d1, d2)
+	})
 }

@@ -55,6 +55,8 @@ github.com/elliotcourant/buffers v0.0.0-20190811025309-24fdba97ca9b h1:hnBfbE6sW
 github.com/elliotcourant/buffers v0.0.0-20190811025309-24fdba97ca9b/go.mod h1:9+oLElsEQnueTyoq0dyr6RiJwELNE+YtLXh4BNAsnKg=
 github.com/elliotcourant/timber v0.0.0-20190803221907-bbe1936d9b11 h1:Yw4VQeyQx9BsRiVVpvn2erbKg7zhzYQm6fHx0jFNcyo=
 github.com/elliotcourant/timber v0.0.0-20190803221907-bbe1936d9b11/go.mod h1:Qt+GcRn3FBq5YMmfc+MtIgGyN4fq3lZaRNYDlkOeigg=
+github.com/elliotcourant/timber v0.0.0-20190817180250-c28b32153fb5 h1:RLMvPiKONbQjKoxR28YqK4sktvIVrrLm94P5+lkGrig=
+github.com/elliotcourant/timber v0.0.0-20190817180250-c28b32153fb5/go.mod h1:Qt+GcRn3FBq5YMmfc+MtIgGyN4fq3lZaRNYDlkOeigg=
 github.com/fatih/color v1.7.0/go.mod h1:Zm6kSWBoL9eyXnKyktHP6abPY2pDugNf5KwzbycvMj4=
 github.com/fsnotify/fsnotify v1.4.7/go.mod h1:jwhsz4b93w/PPRr/qN1Yymfu8t87LnFCMoQvtojpjFo=
 github.com/ghodss/yaml v1.0.1-0.20190212211648-25d852aebe32/go.mod h1:GIjDIg/heH5DOkXY3YJ/wNhfHsQHoXGjl8G8amsYQ1I=

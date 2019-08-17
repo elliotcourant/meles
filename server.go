@@ -3,8 +3,10 @@ package meles
 import (
 	"fmt"
 	"github.com/elliotcourant/timber"
+	"github.com/hashicorp/raft"
 	"io"
 	"net"
+	"time"
 )
 
 type masterServer struct {
@@ -104,53 +106,98 @@ func (i *boatServer) handleConn(conn net.Conn) error {
 			return err
 		}
 
-		switch msg := receivedMsg.(type) {
-		case *applyTransactionRequest:
-			i.logger.Verbosef("received apply transactionBase request from [%s]", msg.NodeID)
-			e := i.boat.apply(*msg.Transaction, nil)
-			if e != nil {
-				if err := r.Send(&errorResponse{
-					Error: e,
-				}); err != nil {
-					return err
+		err = func(receivedMsg rpcClientMessage) error {
+			switch msg := receivedMsg.(type) {
+			case *applyTransactionRequest:
+				i.logger.Verbosef("received apply transactionBase request from [%s]", msg.NodeID)
+
+				if err := i.boat.apply(*msg.Transaction, nil); err != nil {
+					return r.Send(&errorResponse{
+						Error: err,
+					})
 				}
-			} else {
-				if err := r.Send(&applyTransactionResponse{}); err != nil {
-					return err
+				return r.Send(&applyTransactionResponse{})
+			case *discoveryRequest:
+				myNodeId, newNode := i.boat.nodeId, i.boat.getIsNewNode()
+				leaderAddr := raft.ServerAddress("")
+				if !newNode {
+					leaderAddr = i.boat.raft.Leader()
 				}
-			}
-		case *discoveryRequest:
-			myNodeId, newNode := i.boat.nodeId, i.boat.newNode
-			response := &discoveryResponse{
-				NodeID:    myNodeId.RaftID(),
-				IsNewNode: newNode,
-			}
-			if err := r.Send(response); err != nil {
-				return err
-			}
-		case *nextObjectIdRequest:
-			val, e := i.boat.NextObjectID(msg.ObjectPath)
-			if e != nil {
-				if err := r.Send(&errorResponse{
-					Error: e,
-				}); err != nil {
-					return err
+				return r.Send(&discoveryResponse{
+					NodeID:    myNodeId.RaftID(),
+					IsNewNode: newNode,
+					Leader:    leaderAddr,
+				})
+			case *nextObjectIdRequest:
+				val, e := i.boat.NextObjectID(msg.ObjectPath)
+				if e != nil {
+					return r.Send(&errorResponse{
+						Error: e,
+					})
+				} else {
+					return r.Send(&nextObjectIdResponse{
+						Identity: val,
+					})
 				}
-			} else {
-				if err := r.Send(&nextObjectIdResponse{
-					Identity: val,
-				}); err != nil {
-					return err
+			case *joinRequest:
+				if !i.boat.IsLeader() {
+					return r.Send(&errorResponse{
+						Error: raft.ErrNotLeader,
+					})
 				}
+
+				if err := i.boat.raft.VerifyLeader().Error(); err != nil {
+					return r.Send(&errorResponse{
+						Error: err,
+					})
+				}
+
+				future := i.boat.raft.GetConfiguration()
+				if err := future.Error(); err != nil {
+					return r.Send(&errorResponse{
+						Error: err,
+					})
+				}
+				servers := future.Configuration().Servers
+				if !i.boat.options.NumericNodeIds && msg.GenerateNodeId {
+					return r.Send(&errorResponse{
+						Error: fmt.Errorf("cannot generate numeric node Ids yet"),
+					})
+				}
+
+				for _, peer := range servers {
+					if string(peer.Address) == msg.Address {
+						i.logger.Warningf("received join request from an existing peer [%s - %s]", peer.ID, peer.Address)
+						return r.Send(&joinResponse{
+							NodeID:        msg.NodeID,
+							AlreadyJoined: true,
+						})
+					}
+
+					if string(peer.ID) == msg.NodeID && !msg.GenerateNodeId {
+						i.logger.Warningf("potential peer [%s] has duplicate nodeId [%s]", msg.Address, peer.ID)
+						return r.Send(&errorResponse{
+							Error: fmt.Errorf("a node with the provided Id [%s] already exists", msg.NodeID),
+						})
+					}
+				}
+
+				result := i.boat.raft.AddVoter(raft.ServerID(msg.NodeID), raft.ServerAddress(msg.Address), 0, time.Second*10)
+
+				if err := result.Error(); err != nil {
+					return r.Send(&errorResponse{
+						Error: err,
+					})
+				}
+				return r.Send(&joinResponse{NodeID: msg.NodeID})
+			default:
+				return r.Send(&errorResponse{
+					Error: fmt.Errorf("invalid rpc message received [%d]", msg),
+				})
 			}
-		default:
-			e := fmt.Errorf("invalid rpc message received [%d]", msg)
-			if err := r.Send(&errorResponse{
-				Error: e,
-			}); err != nil {
-				return err
-			}
-			return e
+		}(receivedMsg)
+		if err != nil {
+			i.logger.Errorf("failed to handle message [%T]: %v", receivedMsg, err)
 		}
 	}
 }

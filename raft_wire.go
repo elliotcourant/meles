@@ -191,6 +191,8 @@ func (r *serverWireBase) Receive() (clientMessage, error) {
 		msg = &applyTransactionRequest{}
 	case msgNextObjectIdRequest:
 		msg = &nextObjectIdRequest{}
+	case msgJoinRequest:
+		msg = &joinRequest{}
 
 	default:
 		return nil, fmt.Errorf("failed to handle client message of with header [%s]", string(r.msgType))
@@ -285,6 +287,8 @@ func (r *clientWireBase) Receive() (serverMessage, error) {
 		msg = &applyTransactionResponse{}
 	case msgNextObjectIdResponse:
 		msg = &nextObjectIdResponse{}
+	case msgJoinResponse:
+		msg = &joinResponse{}
 
 	default:
 		return nil, fmt.Errorf("failed to handle server message of with header [%s]", string(r.msgType))

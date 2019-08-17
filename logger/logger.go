@@ -100,14 +100,9 @@ type RaftLogger interface {
 	StandardWriter(opts *hclog.StandardLoggerOptions) io.Writer
 }
 
-func NewLogger(addr string) RaftLogger {
-	//
-	// l := timber.New()
-	//
-	l := timber.New().Prefix(addr)
-	l.SetDepth(1)
+func NewLogger(parent timber.Logger) RaftLogger {
 	return &lggr{
-		gologger: l,
+		gologger: parent.With(timber.Keys{}).SetDepth(1),
 	}
 }
 
@@ -156,15 +151,15 @@ func (l *lggr) IsError() bool {
 }
 
 func (l *lggr) With(args ...interface{}) hclog.Logger {
-	return NewLogger("")
+	return NewLogger(l.gologger)
 }
 
 func (l *lggr) Named(name string) hclog.Logger {
-	return NewLogger("")
+	return NewLogger(l.gologger)
 }
 
 func (l *lggr) ResetNamed(name string) hclog.Logger {
-	return NewLogger("")
+	return NewLogger(l.gologger)
 }
 
 func (l *lggr) SetLevel(level hclog.Level) {

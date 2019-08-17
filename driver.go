@@ -10,6 +10,7 @@ type rpcDriver interface {
 	ApplyTransaction(tx transactionStorage) error
 	NextObjectID(objectPath []byte) (uint8, error)
 	Discover() (*discoveryResponse, error)
+	Join() error
 	Close() error
 }
 
@@ -18,6 +19,32 @@ type rpcDriverBase struct {
 	logger timber.Logger
 	w      rpcClientWire
 	c      net.Conn
+}
+
+func (r *rpcDriverBase) Join() error {
+	if err := r.w.Send(&joinRequest{
+		NodeID:         string(r.boat.nodeId.RaftID()),
+		Address:        r.boat.listenAddress,
+		GenerateNodeId: r.boat.options.NumericNodeIds,
+	}); err != nil {
+		return err
+	}
+
+	for {
+		receivedMsg, err := r.w.Receive()
+		if err != nil {
+			return err
+		}
+
+		switch msg := receivedMsg.(type) {
+		case *joinResponse:
+			return nil
+		case *errorResponse:
+			return msg.Error
+		default:
+			return fmt.Errorf("expected join response, received [%T]", msg)
+		}
+	}
 }
 
 func (r *rpcDriverBase) NextObjectID(objectPath []byte) (uint8, error) {

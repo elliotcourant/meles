@@ -67,29 +67,21 @@ func (wrapper *transportWrapperBase) SetNodeID(id raft.ServerID) {
 	wrapper.rpcTransport.logger = wrapper.rpcTransport.logger.Prefix(string(id))
 }
 
-func newTransportWrapperFromListener(listener net.Listener) transportWrapper {
+func newTransportWrapperFromListener(listener net.Listener, logger timber.Logger) transportWrapper {
 	ln := newTransportFromListener(listener)
-	return newTransportWrapperEx(ln)
+	return newTransportWrapperEx(ln, logger)
 }
 
-func newTransportWrapper(addr string) (transportWrapper, error) {
-	ln, err := newTransport(addr)
-	if err != nil {
-		return nil, err
-	}
-	return newTransportWrapperEx(ln), nil
-}
-
-func newTransportWrapperEx(listener transportInterface) transportWrapper {
+func newTransportWrapperEx(listener transportInterface, logger timber.Logger) transportWrapper {
 	wrapper := &transportWrapperBase{
 		transport: listener,
 		raftTransport: &transportWrapperItem{
 			acceptChannel: make(chan accept, 0),
-			logger:        timber.New(),
+			logger:        logger,
 		},
 		rpcTransport: &transportWrapperItem{
 			acceptChannel: make(chan accept, 0),
-			logger:        timber.New(),
+			logger:        logger,
 		},
 	}
 

@@ -19,6 +19,7 @@ const (
 	msgHandshakeRequest        clientMessageType = 'h'
 	msgApplyTransactionRequest clientMessageType = 't'
 	msgNextObjectIdRequest     clientMessageType = 'n'
+	msgJoinRequest             clientMessageType = 'j'
 )
 
 const (
@@ -29,6 +30,7 @@ const (
 	msgHandshakeResponse        serverMessageType = 'H'
 	msgApplyTransactionResponse serverMessageType = 'T'
 	msgNextObjectIdResponse     serverMessageType = 'N'
+	msgJoinResponse             serverMessageType = 'J'
 
 	msgErrorResponse serverMessageType = 'E'
 )
@@ -117,6 +119,8 @@ func writeWireMessage(msg message) []byte {
 		buf.AppendByte(msgApplyTransactionRequest)
 	case *nextObjectIdRequest:
 		buf.AppendByte(msgNextObjectIdRequest)
+	case *joinRequest:
+		buf.AppendByte(msgJoinRequest)
 
 	case *appendEntriesResponse:
 		buf.AppendByte(msgAppendEntriesResponse)
@@ -132,6 +136,8 @@ func writeWireMessage(msg message) []byte {
 		buf.AppendByte(msgApplyTransactionResponse)
 	case *nextObjectIdResponse:
 		buf.AppendByte(msgNextObjectIdResponse)
+	case *joinResponse:
+		buf.AppendByte(msgJoinResponse)
 
 	case *errorResponse:
 		buf.AppendByte(msgErrorResponse)
