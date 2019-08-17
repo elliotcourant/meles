@@ -8,3 +8,7 @@ type Options struct {
 type Store struct {
 	db barge
 }
+
+func NewStore(options *Options) *Store {
+	return nil
+}

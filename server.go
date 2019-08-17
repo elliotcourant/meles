@@ -139,6 +139,17 @@ func (i *boatServer) handleConn(conn net.Conn) error {
 				return r.Send(&incrementResponse{
 					Identity: val,
 				})
+			case *identityRequest:
+				val, err := i.boat.NextIncrementId(getNodeIncrementNodeIdPath())
+				if err != nil {
+					return r.Send(&errorResponse{
+						Error: err,
+					})
+				}
+
+				return r.Send(&identityResponse{
+					Id: val,
+				})
 			case *joinRequest:
 				if !i.boat.IsLeader() {
 					return r.Send(&errorResponse{

@@ -50,6 +50,7 @@ type distOptions struct {
 
 type boat struct {
 	id     raft.ServerID
+	idSync sync.RWMutex
 	nodeId nodeId
 
 	listenAddress string
@@ -109,6 +110,18 @@ func (r *boat) Start() error {
 		return err
 	}
 
+	if shouldJoin && len(shouldJoinAddr) > 0 && r.options.NumericNodeIds {
+		wire, err := r.newRpcConnectionTo(shouldJoinAddr)
+		if err != nil {
+			return err
+		}
+		id, err := wire.GetIdentity()
+		if err != nil {
+			return err
+		}
+		r.nodeId = nodeId(id)
+	}
+
 	r.logger.Prefix(fmt.Sprintf("%s", r.nodeId.RaftID()))
 
 	r.logger.Infof("starting node at address [%s]", r.listenAddress)
@@ -162,41 +175,73 @@ func (r *boat) Start() error {
 	r.raftSync.Lock()
 	r.raft = rft
 	r.raftSync.Unlock()
-	if len(r.options.Peers) == 1 && r.newNode && !shouldJoin {
-		r.logger.Infof("bootstrapping")
-		configuration := raft.Configuration{
-			Servers: []raft.Server{
-				{
-					ID:      config.LocalID,
-					Address: raftTransport.LocalAddr(),
+	if r.newNode {
+		if len(r.options.Peers) == 1 && !shouldJoin {
+			r.logger.Infof("bootstrapping")
+			configuration := raft.Configuration{
+				Servers: []raft.Server{
+					{
+						ID:      config.LocalID,
+						Address: raftTransport.LocalAddr(),
+					},
 				},
-			},
+			}
+			r.raft.BootstrapCluster(configuration)
+		} else if len(r.options.Peers) > 1 && !shouldJoin {
+			r.logger.Infof("bootstrapping")
+			configuration := raft.Configuration{
+				Servers: r.peers,
+			}
+			bootstrapResult := r.raft.BootstrapCluster(configuration)
+			if err := bootstrapResult.Error(); err != nil {
+				r.logger.Errorf("failed to bootstrap: %v", err)
+			} else {
+				r.logger.Infof("successfully bootstrapped node")
+			}
+		} else if len(r.options.Peers) > 1 && shouldJoin && len(shouldJoinAddr) > 0 {
+			r.logger.Infof("attempting to join [%s]", shouldJoinAddr)
+			wire, err := r.newRpcConnectionTo(shouldJoinAddr)
+			if err != nil {
+				return fmt.Errorf("failed to join cluster: %v", err)
+			}
+			if err := wire.Join(); err != nil {
+				return err
+			}
 		}
-		r.raft.BootstrapCluster(configuration)
-	} else if len(r.options.Peers) > 1 && r.newNode && !shouldJoin {
-		r.logger.Infof("bootstrapping")
-		configuration := raft.Configuration{
-			Servers: r.peers,
-		}
-		bootstrapResult := r.raft.BootstrapCluster(configuration)
-		if err := bootstrapResult.Error(); err != nil {
-			r.logger.Errorf("failed to bootstrap: %v", err)
-		} else {
-			r.logger.Infof("successfully bootstrapped node")
-		}
-	} else if len(r.options.Peers) > 1 && shouldJoin && len(shouldJoinAddr) > 0 {
-		r.logger.Infof("attempting to join [%s]", shouldJoinAddr)
-		wire, err := r.newRpcConnectionTo(shouldJoinAddr)
-		if err != nil {
-			return fmt.Errorf("failed to join cluster: %v", err)
-		}
-		if err := wire.Join(); err != nil {
-			return err
+
+		// If we are enforcing numeric Ids then make sure to update
+		// the sequence.
+		if r.options.NumericNodeIds {
+			_, amLeader, err := r.waitForAmILeader(time.Second * 10)
+			if err != nil {
+				return err
+			}
+
+			if amLeader {
+				confFuture := r.raft.GetConfiguration()
+				if err := confFuture.Error(); err != nil {
+					return err
+				}
+				maxId := uint64(len(confFuture.Configuration().Servers))
+
+				for i := uint64(0); i < maxId; i++ {
+					id, err := r.NextIncrementId(getNodeIncrementNodeIdPath())
+					if err != nil {
+						return err
+					}
+					if id == maxId {
+						break
+					}
+				}
+			}
 		}
 	}
+
 	r.logger.Info("raft started")
 	r.setNewNode(false)
+	r.idSync.Lock()
 	r.id = config.LocalID
+	r.idSync.Unlock()
 	return nil
 }
 
@@ -307,6 +352,8 @@ func (r *boat) NextIncrementId(incrementPath []byte) (uint64, error) {
 }
 
 func (r *boat) NodeID() raft.ServerID {
+	r.idSync.Lock()
+	defer r.idSync.Unlock()
 	return r.id
 }
 

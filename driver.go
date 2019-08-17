@@ -10,6 +10,7 @@ type rpcDriver interface {
 	ApplyTransaction(tx transactionStorage) error
 	NextObjectID(objectPath []byte) (uint64, error)
 	Discover() (*discoveryResponse, error)
+	GetIdentity() (uint64, error)
 	Join() error
 	Close() error
 }
@@ -43,6 +44,28 @@ func (r *rpcDriverBase) Join() error {
 			return msg.Error
 		default:
 			return fmt.Errorf("expected join response, received [%T]", msg)
+		}
+	}
+}
+
+func (r *rpcDriverBase) GetIdentity() (uint64, error) {
+	if err := r.w.Send(&identityRequest{}); err != nil {
+		return 0, err
+	}
+
+	for {
+		receivedMsg, err := r.w.Receive()
+		if err != nil {
+			return 0, err
+		}
+
+		switch msg := receivedMsg.(type) {
+		case *identityResponse:
+			return msg.Id, nil
+		case *errorResponse:
+			return 0, msg.Error
+		default:
+			return 0, fmt.Errorf("expected identity response, received [%T]", msg)
 		}
 	}
 }
