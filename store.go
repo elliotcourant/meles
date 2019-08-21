@@ -84,7 +84,7 @@ func newDistributor(listener net.Listener, options *distOptions, l timber.Logger
 	}
 	dbOptions := badger.DefaultOptions(options.Directory)
 	dbOptions.Logger = logger.NewBadgerLogger(l)
-	db, err := badger.Open(dbOptions)
+	db, err := badger.OpenManaged(dbOptions)
 	if err != nil {
 		return nil, err
 	}
@@ -436,7 +436,7 @@ func (r *boat) apply(tx transactionStorage, badgerTxn *badger.Txn) error {
 					return fmt.Errorf("invalid action type [%d]", action.Type)
 				}
 			}
-			return badgerTxn.Commit()
+			return badgerTxn.CommitAt(tx.Timestamp, nil)
 		}
 	}
 	applyFuture := r.raft.Apply(tx.Encode(), applyTimeout)

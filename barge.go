@@ -35,8 +35,11 @@ func (r *boat) Begin() (transaction, error) {
 	if r.IsStopped() {
 		return nil, ErrStopped
 	}
+	ts := uint64(time.Now().UnixNano())
+
 	return &transactionBase{
-		txn:           r.db.NewTransaction(true),
+		timestamp:     ts,
+		txn:           r.db.NewTransactionAt(ts, true),
 		boat:          r,
 		pendingWrites: map[string][]byte{},
 	}, nil
@@ -104,6 +107,7 @@ type transaction interface {
 }
 
 type transactionBase struct {
+	timestamp         uint64
 	closed            bool
 	closedSync        sync.RWMutex
 	boat              *boat
@@ -192,7 +196,7 @@ func (t *transactionBase) Commit() error {
 		return nil
 	}
 	rtx := transactionStorage{
-		Timestamp: uint64(time.Now().UTC().UnixNano()),
+		Timestamp: t.timestamp,
 		Actions:   make([]action, 0),
 	}
 	t.pendingWritesSync.RLock()

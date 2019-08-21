@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"github.com/dgraph-io/badger"
 	"github.com/hashicorp/raft"
+	"time"
 )
 
 type raftLogStore struct {
@@ -41,15 +42,15 @@ func (r *raftLogStore) StoreLog(log *raft.Log) error {
 }
 
 func (r *raftLogStore) StoreLogs(logs []*raft.Log) error {
-	return r.db.Update(func(txn *badger.Txn) error {
-		for _, raftLog := range logs {
-			log := newLogFromRaft(raftLog)
-			if err := txn.Set(log.Path(), log.Encode()); err != nil {
-				return err
-			}
+	txn := r.db.NewTransactionAt(uint64(time.Now().UnixNano()), true)
+	defer txn.Discard()
+	for _, raftLog := range logs {
+		log := newLogFromRaft(raftLog)
+		if err := txn.Set(log.Path(), log.Encode()); err != nil {
+			return err
 		}
-		return nil
-	})
+	}
+	return txn.CommitAt(uint64(time.Now().UnixNano()), nil)
 }
 
 func (r *raftLogStore) DeleteRange(min, max uint64) error {

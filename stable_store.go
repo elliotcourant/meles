@@ -3,6 +3,7 @@ package meles
 import (
 	"encoding/binary"
 	"github.com/dgraph-io/badger"
+	"time"
 )
 
 type raftStableStore struct {
@@ -14,9 +15,12 @@ func (r raftStableStore) getKey(key []byte) []byte {
 }
 
 func (r *raftStableStore) Set(key []byte, val []byte) error {
-	return r.db.Update(func(txn *badger.Txn) error {
-		return txn.Set(r.getKey(key), val)
-	})
+	txn := r.db.NewTransactionAt(uint64(time.Now().UnixNano()), true)
+	defer txn.Discard()
+	if err := txn.Set(r.getKey(key), val); err != nil {
+		return err
+	}
+	return txn.CommitAt(uint64(time.Now().UnixNano()), nil)
 }
 
 func (r *raftStableStore) Get(key []byte) (dst []byte, err error) {

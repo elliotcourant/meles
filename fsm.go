@@ -23,21 +23,21 @@ func (r *raftFsmStore) Apply(log *raft.Log) interface{} {
 	now := time.Now()
 	defer r.logger.Verbosef("apply transactionBase time: %s", time.Since(now))
 	r.logger.Verbosef("applying transactionBase, delayed: %s", time.Since(delay))
-	return r.db.Update(func(txn *badger.Txn) error {
-		for _, action := range transaction.Actions {
-			switch action.Type {
-			case actionTypeSet:
-				if err := txn.Set(action.Key, action.Value); err != nil {
-					return err
-				}
-			case actionTypeDelete:
-				if err := txn.Delete(action.Key); err != nil {
-					return err
-				}
+	txn := r.db.NewTransactionAt(transaction.Timestamp, true)
+	defer txn.Discard()
+	for _, action := range transaction.Actions {
+		switch action.Type {
+		case actionTypeSet:
+			if err := txn.Set(action.Key, action.Value); err != nil {
+				return err
+			}
+		case actionTypeDelete:
+			if err := txn.Delete(action.Key); err != nil {
+				return err
 			}
 		}
-		return nil
-	})
+	}
+	return txn.CommitAt(transaction.Timestamp, nil)
 }
 
 func (r *raftFsmStore) Restore(rc io.ReadCloser) error {
