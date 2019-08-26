@@ -78,6 +78,10 @@ func (s *Transaction) Rollback() error {
 	return s.txn.Rollback()
 }
 
+func (s *Transaction) NextIncrementId(objectPath []byte) (uint64, error) {
+	return s.txn.NextIncrementId(objectPath)
+}
+
 func (s *Transaction) GetIterator(prefix []byte, keyOnly bool, reverse bool) *Iterator {
 	return &Iterator{
 		i: s.txn.GetKeyIterator(prefix, keyOnly, reverse),
