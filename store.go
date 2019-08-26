@@ -176,7 +176,7 @@ func (r *boat) Start() error {
 	r.raft = rft
 	r.raftSync.Unlock()
 	if r.newNode {
-		if len(r.options.Peers) == 1 && !shouldJoin {
+		if len(r.peers) == 1 && !shouldJoin {
 			r.logger.Infof("bootstrapping")
 			configuration := raft.Configuration{
 				Servers: []raft.Server{
@@ -187,7 +187,7 @@ func (r *boat) Start() error {
 				},
 			}
 			r.raft.BootstrapCluster(configuration)
-		} else if len(r.options.Peers) > 1 && !shouldJoin {
+		} else if len(r.peers) > 1 && !shouldJoin {
 			r.logger.Infof("bootstrapping")
 			configuration := raft.Configuration{
 				Servers: r.peers,
@@ -198,7 +198,7 @@ func (r *boat) Start() error {
 			} else {
 				r.logger.Infof("successfully bootstrapped node")
 			}
-		} else if len(r.options.Peers) > 1 && shouldJoin && len(shouldJoinAddr) > 0 {
+		} else if len(r.peers) > 1 && shouldJoin && len(shouldJoinAddr) > 0 {
 			r.logger.Infof("attempting to join [%s]", shouldJoinAddr)
 			wire, err := r.newRpcConnectionTo(shouldJoinAddr)
 			if err != nil {
