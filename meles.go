@@ -77,3 +77,41 @@ func (s *Transaction) Commit() error {
 func (s *Transaction) Rollback() error {
 	return s.txn.Rollback()
 }
+
+func (s *Transaction) GetIterator(prefix []byte, keyOnly bool, reverse bool) *Iterator {
+	return &Iterator{
+		i: s.txn.GetKeyIterator(prefix, keyOnly, reverse),
+	}
+}
+
+type Iterator struct {
+	i iterator
+}
+
+func (i *Iterator) Close() {
+	i.i.Close()
+}
+
+func (i *Iterator) Item() *badger.Item {
+	return i.i.Item()
+}
+
+func (i *Iterator) Next() {
+	i.i.Next()
+}
+
+func (i *Iterator) Valid() bool {
+	return i.i.Valid()
+}
+
+func (i *Iterator) Seek(key []byte) {
+	i.i.Seek(key)
+}
+
+func (i *Iterator) ValidForPrefix(prefix []byte) bool {
+	return i.i.ValidForPrefix(prefix)
+}
+
+func (i *Iterator) Rewind() {
+	i.i.Rewind()
+}

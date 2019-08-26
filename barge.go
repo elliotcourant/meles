@@ -45,7 +45,7 @@ func (r *boat) Begin() (transaction, error) {
 	}, nil
 }
 
-type Iterator interface {
+type iterator interface {
 	Close()
 	Item() *badger.Item
 	Next()
@@ -98,7 +98,7 @@ type transaction interface {
 	Set(key, value []byte) error
 	Delete(key []byte) error
 
-	GetKeyIterator(prefix []byte, keyOnly bool, reverse bool) Iterator
+	GetKeyIterator(prefix []byte, keyOnly bool, reverse bool) iterator
 
 	NextIncrementId(objectPath []byte) (uint64, error)
 
@@ -124,7 +124,7 @@ func (t *transactionBase) NextIncrementId(objectPath []byte) (uint64, error) {
 	return t.boat.NextIncrementId(objectPath)
 }
 
-func (t *transactionBase) GetKeyIterator(prefix []byte, keyOnly bool, reverse bool) Iterator {
+func (t *transactionBase) GetKeyIterator(prefix []byte, keyOnly bool, reverse bool) iterator {
 	itr := t.txn.NewIterator(badger.IteratorOptions{
 		PrefetchValues: !keyOnly,
 		Reverse:        reverse,
