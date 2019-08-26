@@ -215,6 +215,8 @@ func (r *boat) Start() error {
 	r.idSync.Lock()
 	r.id = config.LocalID
 	r.idSync.Unlock()
+
+	r.WaitForLeader(time.Second * 10)
 	return nil
 }
 
