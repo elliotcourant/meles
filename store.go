@@ -51,7 +51,6 @@ type distOptions struct {
 type boat struct {
 	id     raft.ServerID
 	idSync sync.RWMutex
-	nodeId nodeId
 
 	listenAddress string
 	db            *badger.DB
@@ -96,7 +95,7 @@ func newDistributor(listener net.Listener, options *distOptions, l timber.Logger
 		listenAddress:   addr,
 		objectSequences: map[string]*incrementSequence{},
 	}
-	r.nodeId, r.peers, r.newNode, err = r.determineNodeId()
+	r.id, r.peers, r.newNode, err = r.determineNodeId()
 	return r, err
 }
 
@@ -119,10 +118,10 @@ func (r *boat) Start() error {
 		if err != nil {
 			return err
 		}
-		r.nodeId = nodeId(id)
+		r.id = nodeId(id).RaftID()
 	}
 
-	r.logger.Prefix(fmt.Sprintf("%s", r.nodeId.RaftID()))
+	r.logger.Prefix(string(r.id))
 
 	r.logger.Infof("starting node at address [%s]", r.listenAddress)
 
@@ -143,7 +142,7 @@ func (r *boat) Start() error {
 		SnapshotInterval:   time.Minute * 5,
 		SnapshotThreshold:  512,
 		LeaderLeaseTimeout: time.Millisecond * 500,
-		LocalID:            r.nodeId.RaftID(),
+		LocalID:            r.id,
 		NotifyCh:           nil,
 		Logger:             logger.NewLogger(r.logger),
 	}
@@ -482,7 +481,7 @@ func (r *boat) runBoatServer() {
 	bs.runBoatServer()
 }
 
-func (r *boat) determineNodeId() (id nodeId, servers []raft.Server, newNode bool, err error) {
+func (r *boat) determineNodeId() (id raft.ServerID, servers []raft.Server, newNode bool, err error) {
 	if !r.options.NumericNodeIds {
 		panic("non numeric node Ids are not yet supported")
 	}
@@ -499,23 +498,23 @@ func (r *boat) determineNodeId() (id nodeId, servers []raft.Server, newNode bool
 		_, err = item.ValueCopy(val)
 		return err
 	}); err != nil {
-		return 0, nil, true, err
+		return "", nil, true, err
 	}
 
 	if len(val) == 8 {
-		id = nodeId(binary.BigEndian.Uint64(val))
+		id = nodeId(binary.BigEndian.Uint64(val)).RaftID()
 		return id, nil, false, nil
 	}
 
 	myParsedAddress, err := network.ResolveAddress(r.listenAddress)
 	if err != nil {
-		return 0, nil, true, err
+		return "", nil, true, err
 	}
 	peers := make([]string, len(r.options.Peers))
 	for i, peer := range r.options.Peers {
 		addr, err := network.ResolveAddress(peer)
 		if err != nil {
-			return 0, nil, true, err
+			return "", nil, true, err
 		}
 		peers[i] = addr
 	}
@@ -537,6 +536,6 @@ func (r *boat) determineNodeId() (id nodeId, servers []raft.Server, newNode bool
 	id = nodeId(linq.From(peers).IndexOf(func(i interface{}) bool {
 		addr, ok := i.(string)
 		return ok && addr == myParsedAddress
-	}) + 1)
+	}) + 1).RaftID()
 	return id, servers, true, nil
 }

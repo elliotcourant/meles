@@ -118,13 +118,13 @@ func (i *boatServer) handleConn(conn net.Conn) error {
 				}
 				return r.Send(&applyTransactionResponse{})
 			case *discoveryRequest:
-				myNodeId, newNode := i.boat.nodeId, i.boat.getIsNewNode()
+				myNodeId, newNode := i.boat.NodeID(), i.boat.getIsNewNode()
 				leaderAddr := raft.ServerAddress("")
 				if !newNode {
 					leaderAddr = i.boat.raft.Leader()
 				}
 				return r.Send(&discoveryResponse{
-					NodeID:    myNodeId.RaftID(),
+					NodeID:    myNodeId,
 					IsNewNode: newNode,
 					Leader:    leaderAddr,
 				})

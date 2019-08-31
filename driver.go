@@ -24,7 +24,7 @@ type rpcDriverBase struct {
 
 func (r *rpcDriverBase) Join() error {
 	if err := r.w.Send(&joinRequest{
-		NodeID:         string(r.boat.nodeId.RaftID()),
+		NodeID:         string(r.boat.id),
 		Address:        r.boat.listenAddress,
 		GenerateNodeId: r.boat.options.NumericNodeIds,
 	}); err != nil {
@@ -121,7 +121,7 @@ func (r *rpcDriverBase) ApplyTransaction(tx transactionStorage) error {
 
 func (r *rpcDriverBase) Discover() (*discoveryResponse, error) {
 	if err := r.w.Send(&discoveryRequest{
-		NodeID: r.boat.nodeId.RaftID(),
+		NodeID: r.boat.id,
 	}); err != nil {
 		return nil, err
 	}
