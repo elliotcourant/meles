@@ -30,6 +30,7 @@ type barge interface {
 	IsStopped() bool
 	NodeID() raft.ServerID
 	NextIncrementId(objectPath []byte) (uint64, error)
+	NextSequenceValueById(sequenceName string) (uint64, error)
 }
 
 func (r *boat) Begin() (transaction, error) {
@@ -108,6 +109,7 @@ type transaction interface {
 
 	Rollback() error
 	Commit() error
+	Discard()
 }
 
 type transactionBase struct {
@@ -219,6 +221,11 @@ func (t *transactionBase) Commit() error {
 	}
 	rtx.Timestamp = uint64(time.Now().UnixNano())
 	return t.boat.apply(rtx, t.txn)
+}
+
+func (t *transactionBase) Discard() {
+	defer t.finishTransaction()
+	t.txn.Discard()
 }
 
 func (t *transactionBase) addPendingWrite(key []byte, value []byte) {

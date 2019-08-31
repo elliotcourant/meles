@@ -168,6 +168,23 @@ func (i *boatServer) handleConn(conn net.Conn) error {
 				return r.Send(&identityResponse{
 					Id: val,
 				})
+			case *distSequenceRequest:
+				if !i.boat.IsLeader() {
+					return r.Send(&errorResponse{
+						Error: raft.ErrNotLeader,
+					})
+				}
+
+				chunk, err := i.boat.GetSequenceChunk(msg.SequenceName)
+				if err != nil {
+					return r.Send(&errorResponse{
+						Error: err,
+					})
+				}
+
+				return r.Send(&distSequenceResponse{
+					distSequenceChunk: *chunk,
+				})
 			case *joinRequest:
 				if !i.boat.IsLeader() {
 					return r.Send(&errorResponse{

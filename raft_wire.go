@@ -195,6 +195,8 @@ func (r *serverWireBase) Receive() (clientMessage, error) {
 		msg = &joinRequest{}
 	case msgIdentityRequest:
 		msg = &identityRequest{}
+	case msgDistIdentityRequest:
+		msg = &distSequenceRequest{}
 
 	default:
 		return nil, fmt.Errorf("failed to handle client message of with header [%s]", string(r.msgType))
@@ -293,6 +295,8 @@ func (r *clientWireBase) Receive() (serverMessage, error) {
 		msg = &joinResponse{}
 	case msgIdentityResponse:
 		msg = &identityResponse{}
+	case msgDistIdentityResponse:
+		msg = &distSequenceResponse{}
 
 	default:
 		return nil, fmt.Errorf("failed to handle server message of with header [%s]", string(r.msgType))

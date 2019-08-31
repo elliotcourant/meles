@@ -9,6 +9,7 @@ import (
 type rpcDriver interface {
 	ApplyTransaction(tx transactionStorage) error
 	NextObjectID(objectPath []byte) (uint64, error)
+	NextSequenceChunk(sequenceName string) (*distSequenceChunk, error)
 	Discover() (*discoveryResponse, error)
 	GetIdentity() (uint64, error)
 	Join() error
@@ -20,6 +21,30 @@ type rpcDriverBase struct {
 	logger timber.Logger
 	w      rpcClientWire
 	c      net.Conn
+}
+
+func (r *rpcDriverBase) NextSequenceChunk(sequenceName string) (*distSequenceChunk, error) {
+	if err := r.w.Send(&distSequenceRequest{
+		SequenceName: sequenceName,
+	}); err != nil {
+		return nil, err
+	}
+
+	for {
+		receivedMsg, err := r.w.Receive()
+		if err != nil {
+			return nil, err
+		}
+
+		switch msg := receivedMsg.(type) {
+		case *distSequenceResponse:
+			return &msg.distSequenceChunk, nil
+		case *errorResponse:
+			return nil, msg.Error
+		default:
+			return nil, fmt.Errorf("expected identity response, received [%T]", msg)
+		}
+	}
 }
 
 func (r *rpcDriverBase) Join() error {

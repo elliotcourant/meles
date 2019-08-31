@@ -7,7 +7,7 @@ require (
 	github.com/dgraph-io/badger v1.6.0
 	github.com/elliotcourant/arkdb v0.0.0-20190815024416-90a1d44487d5 // indirect
 	github.com/elliotcourant/buffers v0.0.0-20190811025309-24fdba97ca9b
-	github.com/elliotcourant/timber v0.0.0-20190817180250-c28b32153fb5
+	github.com/elliotcourant/timber v0.0.0-20190831033938-85b1f62dde82
 	github.com/hashicorp/go-hclog v0.9.2
 	github.com/hashicorp/raft v1.1.1
 	github.com/jackc/pgx v3.5.1-0.20190806214632-ca9de5125695+incompatible

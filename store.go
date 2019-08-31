@@ -67,6 +67,12 @@ type boat struct {
 	objectSequences     map[string]*incrementSequence
 	objectSequencesSync sync.Mutex
 
+	distSequences    map[string]*distSequence
+	distSequenceSync sync.Mutex
+
+	distCache     map[string]*distSequenceCache
+	distCacheSync sync.Mutex
+
 	peerPool map[raft.ServerAddress]sync.Pool
 	peerSync sync.Mutex
 
@@ -94,6 +100,8 @@ func newDistributor(listener net.Listener, options *distOptions, l timber.Logger
 		ln:              ln,
 		listenAddress:   addr,
 		objectSequences: map[string]*incrementSequence{},
+		distCache:       map[string]*distSequenceCache{},
+		distSequences:   map[string]*distSequence{},
 	}
 	r.id, r.peers, r.newNode, err = r.determineNodeId()
 	return r, err

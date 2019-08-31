@@ -21,6 +21,7 @@ const (
 	msgIncrementRequest        clientMessageType = 'n'
 	msgJoinRequest             clientMessageType = 'j'
 	msgIdentityRequest         clientMessageType = '1'
+	msgDistIdentityRequest     clientMessageType = '2'
 )
 
 const (
@@ -33,6 +34,7 @@ const (
 	msgIncrementResponse        serverMessageType = 'N'
 	msgJoinResponse             serverMessageType = 'J'
 	msgIdentityResponse         serverMessageType = '!'
+	msgDistIdentityResponse     serverMessageType = '@'
 
 	msgErrorResponse serverMessageType = 'E'
 )
@@ -125,6 +127,8 @@ func writeWireMessage(msg message) []byte {
 		buf.AppendByte(msgJoinRequest)
 	case *identityRequest:
 		buf.AppendByte(msgIdentityRequest)
+	case *distSequenceRequest:
+		buf.AppendByte(msgDistIdentityRequest)
 
 	case *appendEntriesResponse:
 		buf.AppendByte(msgAppendEntriesResponse)
@@ -144,6 +148,8 @@ func writeWireMessage(msg message) []byte {
 		buf.AppendByte(msgJoinResponse)
 	case *identityResponse:
 		buf.AppendByte(msgIdentityResponse)
+	case *distSequenceResponse:
+		buf.AppendByte(msgDistIdentityResponse)
 
 	case *errorResponse:
 		buf.AppendByte(msgErrorResponse)
