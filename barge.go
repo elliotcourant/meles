@@ -25,6 +25,7 @@ type barge interface {
 	WaitForLeader(timeout time.Duration) (string, bool, error)
 	IsLeader() bool
 	Begin() (transaction, error)
+	BeginAt(timestamp time.Time) (transaction, error)
 	Stop() error
 	IsStopped() bool
 	NodeID() raft.ServerID
@@ -32,11 +33,14 @@ type barge interface {
 }
 
 func (r *boat) Begin() (transaction, error) {
+	return r.BeginAt(time.Now())
+}
+
+func (r *boat) BeginAt(timestamp time.Time) (transaction, error) {
 	if r.IsStopped() {
 		return nil, ErrStopped
 	}
-	ts := uint64(time.Now().UnixNano())
-
+	ts := uint64(timestamp.UnixNano())
 	return &transactionBase{
 		timestamp:     ts,
 		txn:           r.db.NewTransactionAt(ts, true),
@@ -213,6 +217,7 @@ func (t *transactionBase) Commit() error {
 			Value: v,
 		})
 	}
+	rtx.Timestamp = uint64(time.Now().UnixNano())
 	return t.boat.apply(rtx, t.txn)
 }
 
