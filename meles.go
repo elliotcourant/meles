@@ -60,6 +60,10 @@ func (s *Store) NextIncrementId(objectPath []byte) (uint64, error) {
 	return s.db.NextIncrementId(objectPath)
 }
 
+func (s *Store) NextSequenceId(sequenceName string) (uint64, error) {
+	return s.db.NextSequenceValueById(sequenceName)
+}
+
 func (s *Store) Begin() (*Transaction, error) {
 	return s.BeginAt(time.Now())
 }
@@ -108,6 +112,10 @@ func (s *Transaction) Rollback() error {
 
 func (s *Transaction) NextIncrementId(objectPath []byte) (uint64, error) {
 	return s.txn.NextIncrementId(objectPath)
+}
+
+func (s *Transaction) NextSequenceId(sequenceName string) (uint64, error) {
+	return s.db.NextSequenceValueById(sequenceName)
 }
 
 func (s *Transaction) GetIterator(prefix []byte, keyOnly bool, reverse bool) *Iterator {

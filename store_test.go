@@ -5,6 +5,7 @@ import (
 	"github.com/elliotcourant/meles/testutils"
 	"github.com/elliotcourant/timber"
 	"github.com/stretchr/testify/assert"
+	"math"
 	"testing"
 	"time"
 )
@@ -286,6 +287,93 @@ func TestNewDistributor(t *testing.T) {
 
 		// Make sure that the remaining nodes all have the same leader.
 		VerifyLeader(t, nodes...)
+	})
+
+	t.Run("majority failure", func(t *testing.T) {
+		numberOfNodes := 9
+
+		listeners := make([]transportInterface, numberOfNodes)
+		peers := make([]string, numberOfNodes)
+		for i := range listeners {
+			ln, err := newTransport(":")
+			assert.NoError(t, err)
+			listeners[i] = ln
+			peers[i] = ln.Addr().String()
+		}
+
+		cleanups := make([]func(), numberOfNodes)
+		nodes := make([]barge, numberOfNodes)
+
+		for i := 0; i < numberOfNodes; i++ {
+			func() {
+				tempDir, cleanup := testutils.NewTempDirectory(t)
+				cleanups[i] = cleanup
+
+				d, err := newDistributor(listeners[i], &distOptions{
+					Directory: tempDir,
+					Peers:     peers,
+				}, timber.With(timber.Keys{
+					"test": t.Name(),
+				}))
+				assert.NoError(t, err)
+				assert.NotNil(t, d)
+
+				nodes[i] = d
+			}()
+		}
+
+		defer func(cleanups []func()) {
+			for _, cleanup := range cleanups {
+				cleanup()
+			}
+		}(cleanups)
+
+		timber.Debugf("created %d node(s), starting now", numberOfNodes)
+
+		for _, node := range nodes {
+			go func(node barge) {
+				err := node.Start()
+				assert.NoError(t, err)
+			}(node)
+		}
+
+		// Make sure all of the nodes have the same leader
+		VerifyLeader(t, nodes...)
+
+		majority := int(math.Round(float64(numberOfNodes)/2) + 1)
+		timber.Debugf("killing %d nodes", majority)
+		killed := 0
+		// Kill the leader node to force an election.
+		for _, node := range nodes {
+			if killed >= majority {
+				break
+			}
+			timber.Warningf("killing leader node [%s]", node.NodeID())
+			err := node.Stop()
+			assert.NoError(t, err)
+			killed++
+		}
+
+		// Wait a short amount of time for a new leader
+		time.Sleep(5 * time.Second)
+
+		var n barge
+		for _, node := range nodes {
+			if node.IsStopped() {
+				continue
+			}
+			n = node
+			break
+		}
+
+		//noinspection GoNilness
+		txn, err := n.Begin()
+		assert.NoError(t, err)
+
+		err = txn.Set([]byte("test"), []byte("value"))
+		assert.NoError(t, err)
+		err = txn.Commit()
+		assert.Error(t, err)
 	})
 
 	t.Run("leader write", func(t *testing.T) {

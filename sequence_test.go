@@ -148,7 +148,9 @@ func TestBoat_GetSequenceChunk(t *testing.T) {
 		d, err := newDistributor(ln, &distOptions{
 			Directory: tempDir,
 			Peers:     []string{ln.Addr().String()},
-		}, log)
+		}, timber.With(timber.Keys{
+			"test": t.Name(),
+		}))
 		assert.NoError(t, err)
 		assert.NotNil(t, d)
 
@@ -211,7 +213,9 @@ func TestBoat_GetSequenceChunk(t *testing.T) {
 				d, err := newDistributor(listeners[i], &distOptions{
 					Directory: tempDir,
 					Peers:     peers,
-				}, log)
+				}, timber.With(timber.Keys{
+					"test": t.Name(),
+				}))
 				assert.NoError(t, err)
 				assert.NotNil(t, d)
 
@@ -244,6 +248,7 @@ func TestBoat_GetSequenceChunk(t *testing.T) {
 		for _, node := range nodes {
 			go func(node barge) {
 				defer wg.Done()
+				log.Infof("generating Ids on node [%s]", node.NodeID())
 				for x := 0; x < numberOfIds; x++ {
 					id, err := node.NextSequenceValueById("accountIds")
 					assert.NoError(t, err)
