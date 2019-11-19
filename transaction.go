@@ -39,9 +39,10 @@ func (i *transactionStorage) Decode(src []byte) error {
 type actionType uint8
 
 const (
-	actionTypeNone   actionType = 0
-	actionTypeSet    actionType = 1
-	actionTypeDelete actionType = 2
+	actionTypeNone actionType = iota
+	actionTypeSet
+	actionTypeGet
+	actionTypeDelete
 )
 
 type action struct {

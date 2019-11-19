@@ -47,6 +47,7 @@ func (r *boat) BeginAt(timestamp time.Time) (transaction, error) {
 		txn:           r.db.NewTransactionAt(ts, true),
 		boat:          r,
 		pendingWrites: map[string][]byte{},
+		mustGet:       map[string]interface{}{},
 	}, nil
 }
 
@@ -100,6 +101,11 @@ func (i *iteratorBase) Rewind() {
 type transaction interface {
 	Get(key []byte) ([]byte, error)
 	GetEx(key []byte, value Decoder) error
+
+	// MustGet will perform a normal Get locally, but when the transaction is committed
+	// it will make sure to check for conflicts on this key that is being read.
+	MustGet(key []byte) ([]byte, error)
+
 	Set(key, value []byte) error
 	Delete(key []byte) error
 
@@ -120,6 +126,8 @@ type transactionBase struct {
 	txn               *badger.Txn
 	pendingWrites     map[string][]byte
 	pendingWritesSync sync.RWMutex
+	mustGet           map[string]interface{}
+	mustGetSync       sync.RWMutex
 }
 
 func (t *transactionBase) Delete(key []byte) error {
@@ -162,6 +170,12 @@ func (t *transactionBase) GetEx(key []byte, value Decoder) error {
 	return value.Decode(v)
 }
 
+func (t *transactionBase) MustGet(key []byte) (value []byte, err error) {
+	value, err = t.Get(key)
+	t.addMustGet(key)
+	return
+}
+
 func (t *transactionBase) Set(key, val []byte) error {
 	if t.isFinished() {
 		return fmt.Errorf("transactionBase closed")
@@ -192,22 +206,32 @@ func (t *transactionBase) Commit() error {
 	if t.boat.IsStopped() {
 		return ErrStopped
 	}
+
 	startTime := time.Now()
 	defer t.boat.logger.Verbosef("time to commit: %s", time.Since(startTime))
+
 	if t.isFinished() {
 		return fmt.Errorf("transactionBase closed")
 	}
+
 	defer t.finishTransaction()
 	if t.getNumberOfPendingWrites() == 0 {
 		return nil
 	}
+
 	rtx := transactionStorage{
 		Timestamp: t.timestamp,
 		Actions:   make([]action, 0),
 	}
+
 	t.pendingWritesSync.RLock()
+	t.mustGetSync.RLock()
 	defer t.pendingWritesSync.RUnlock()
-	t.boat.logger.Verbosef("preparing to commit %d pending write(s)", len(t.pendingWrites))
+	defer t.mustGetSync.RUnlock()
+
+	t.boat.logger.Verbosef("preparing to commit %d pending write(s) and %d must read(s)",
+		len(t.pendingWrites), len(t.mustGet))
+
 	for k, v := range t.pendingWrites {
 		actionType := actionTypeSet
 		if v == nil {
@@ -219,13 +243,27 @@ func (t *transactionBase) Commit() error {
 			Value: v,
 		})
 	}
-	rtx.Timestamp = uint64(time.Now().UnixNano())
+
+	for k := range t.mustGet {
+		rtx.Actions = append(rtx.Actions, action{
+			Type:  actionTypeGet,
+			Key:   []byte(k),
+			Value: nil,
+		})
+	}
+
 	return t.boat.apply(rtx, t.txn)
 }
 
 func (t *transactionBase) Discard() {
 	defer t.finishTransaction()
 	t.txn.Discard()
+}
+
+func (t *transactionBase) addMustGet(key []byte) {
+	t.mustGetSync.Lock()
+	defer t.mustGetSync.Unlock()
+	t.mustGet[string(key)] = nil
 }
 
 func (t *transactionBase) addPendingWrite(key []byte, value []byte) {

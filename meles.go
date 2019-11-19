@@ -94,6 +94,16 @@ func (s *Transaction) Get(key []byte) ([]byte, bool, error) {
 	return val, true, nil
 }
 
+func (s *Transaction) MustGet(key []byte) ([]byte, bool, error) {
+	val, err := s.txn.MustGet(key)
+	if err == badger.ErrKeyNotFound {
+		return nil, false, nil
+	} else if err != nil {
+		return nil, false, err
+	}
+	return val, true, nil
+}
+
 func (s *Transaction) Delete(key []byte) error {
 	return s.txn.Set(key, nil)
 }

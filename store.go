@@ -223,8 +223,8 @@ func (r *boat) Start() error {
 	r.id = config.LocalID
 	r.idSync.Unlock()
 
-	r.WaitForLeader(time.Second * 10)
-	return nil
+	_, _, err = r.WaitForLeader(time.Second * 30)
+	return err
 }
 
 func (r *boat) setNewNode(val bool) {
@@ -435,6 +435,10 @@ func (r *boat) apply(tx transactionStorage, badgerTxn *badger.Txn) error {
 				switch action.Type {
 				case actionTypeSet:
 					if err := badgerTxn.Set(action.Key, action.Value); err != nil {
+						return err
+					}
+				case actionTypeGet:
+					if _, err := badgerTxn.Get(action.Key); err != nil && err != badger.ErrKeyNotFound {
 						return err
 					}
 				case actionTypeDelete:
