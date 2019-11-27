@@ -5,13 +5,15 @@ import (
 )
 
 type transactionStorage struct {
-	Timestamp uint64
-	Actions   []action
+	Timestamp       uint64
+	CommitTimestamp uint64
+	Actions         []action
 }
 
 func (i *transactionStorage) Encode() []byte {
 	buf := buffers.NewBytesBuffer()
 	buf.AppendUint64(i.Timestamp)
+	buf.AppendUint64(i.CommitTimestamp)
 	buf.AppendUint32(uint32(len(i.Actions)))
 	for _, action := range i.Actions {
 		buf.Append(action.Encode()...)
@@ -23,6 +25,7 @@ func (i *transactionStorage) Decode(src []byte) error {
 	*i = transactionStorage{}
 	buf := buffers.NewBytesReader(src)
 	i.Timestamp = buf.NextUint64()
+	i.CommitTimestamp = buf.NextUint64()
 	length := buf.NextUint32()
 	i.Actions = make([]action, length)
 	for index := range i.Actions {

@@ -25,19 +25,36 @@ func (r *raftFsmStore) Apply(log *raft.Log) interface{} {
 	r.logger.Verbosef("applying transactionBase, delayed: %s", time.Since(delay))
 	txn := r.db.NewTransactionAt(transaction.Timestamp, true)
 	defer txn.Discard()
-	for _, action := range transaction.Actions {
-		switch action.Type {
-		case actionTypeSet:
-			if err := txn.Set(action.Key, action.Value); err != nil {
-				return err
-			}
-		case actionTypeDelete:
-			if err := txn.Delete(action.Key); err != nil {
-				return err
+
+	for i := 0; i < 2; i++ {
+		for _, action := range transaction.Actions {
+			switch action.Type {
+			case actionTypeSet:
+				if i == 0 {
+					continue
+				}
+				if err := txn.Set(action.Key, action.Value); err != nil {
+					return err
+				}
+			case actionTypeGet:
+				if i > 0 {
+					continue
+				}
+				if _, err := txn.Get(action.Key); err != nil && err != badger.ErrKeyNotFound {
+					return err
+				}
+			case actionTypeDelete:
+				if i == 0 {
+					continue
+				}
+				if err := txn.Delete(action.Key); err != nil {
+					return err
+				}
 			}
 		}
 	}
-	return txn.CommitAt(transaction.Timestamp, nil)
+
+	return txn.CommitAt(transaction.CommitTimestamp, nil)
 }
 
 func (r *raftFsmStore) Restore(rc io.ReadCloser) error {

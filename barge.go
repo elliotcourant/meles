@@ -220,8 +220,9 @@ func (t *transactionBase) Commit() error {
 	}
 
 	rtx := transactionStorage{
-		Timestamp: t.timestamp,
-		Actions:   make([]action, 0),
+		Timestamp:       t.timestamp,
+		CommitTimestamp: uint64(time.Now().UnixNano()),
+		Actions:         make([]action, 0),
 	}
 
 	t.pendingWritesSync.RLock()

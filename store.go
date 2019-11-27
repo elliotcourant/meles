@@ -437,23 +437,29 @@ func (r *boat) apply(tx transactionStorage, badgerTxn *badger.Txn) error {
 					if err := badgerTxn.Set(action.Key, action.Value); err != nil {
 						return err
 					}
-				case actionTypeGet:
-					if _, err := badgerTxn.Get(action.Key); err != nil && err != badger.ErrKeyNotFound {
-						return err
-					}
 				case actionTypeDelete:
 					if err := badgerTxn.Delete(action.Key); err != nil {
 						return err
 					}
+				case actionTypeGet:
+					// Do nothing for get actions here. We already know the transaction will not
+					// conflict if it succeeded on the leader.
 				default:
 					return fmt.Errorf("invalid action type [%d]", action.Type)
 				}
 			}
-			return badgerTxn.CommitAt(tx.Timestamp, nil)
+			return badgerTxn.CommitAt(tx.CommitTimestamp, nil)
 		}
 	}
 	applyFuture := r.raft.Apply(tx.Encode(), applyTimeout)
-	return applyFuture.Error()
+	if err = applyFuture.Error(); err != nil {
+		return err
+	}
+
+	if err, ok := applyFuture.Response().(error); ok && err != nil {
+		return err
+	}
+	return nil
 }
 
 func (r *boat) stableStore() raft.StableStore {
