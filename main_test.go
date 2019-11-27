@@ -21,11 +21,17 @@ func TestMain(m *testing.M) {
 
 type TestCluster []*meles.Store
 
-func (c TestCluster) Set(t *testing.T, key, value string) {
+func (c TestCluster) RandomNode() *meles.Store {
 	node := c[rand.Int()%len(c)]
 	for node.IsStopped() {
 		node = c[rand.Int()%len(c)]
 	}
+
+	return node
+}
+
+func (c TestCluster) Set(t *testing.T, key, value string) {
+	node := c.RandomNode()
 
 	txn, err := node.Begin()
 	if !assert.NoError(t, err, "could not start transaction on node [%s]", node.NodeID()) {
@@ -42,6 +48,7 @@ func (c TestCluster) Set(t *testing.T, key, value string) {
 }
 
 func (c TestCluster) VerifyLeader(t *testing.T) {
+	time.Sleep(2 * time.Second)
 	timber.Infof("verifying leader for %d node(s)", len(c))
 	start := time.Now()
 	maxRetry := 5
@@ -95,7 +102,7 @@ TryAgain:
 	timber.Infof("value verification for [%s] time: %s retries: %d", key, time.Since(start), retries)
 }
 
-func NewStore(t *testing.T) (*meles.Store, func()) {
+func NewStore(t *testing.T, peers ...string) (*meles.Store, func()) {
 	tempDir, cleanup := testutils.NewTempDirectory(t)
 	log := timber.With(timber.Keys{
 		"test": t.Name(),
@@ -106,6 +113,7 @@ func NewStore(t *testing.T) (*meles.Store, func()) {
 
 	store, err := meles.NewStore(listener, log, meles.Options{
 		Directory: tempDir,
+		Peers:     peers,
 	})
 	assert.NoError(t, err)
 
@@ -113,7 +121,10 @@ func NewStore(t *testing.T) (*meles.Store, func()) {
 	assert.NoError(t, err)
 
 	assert.False(t, store.IsStopped())
-	assert.True(t, store.IsLeader())
+
+	if len(peers) == 0 {
+		assert.True(t, store.IsLeader())
+	}
 
 	return store, func() {
 		store.Stop()

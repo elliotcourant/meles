@@ -166,3 +166,104 @@ func TestClustering_Shutdown(t *testing.T) {
 		cluster.VerifyLeader(t)
 	})
 }
+
+func TestFailure(t *testing.T) {
+	t.Run("minority failure", func(t *testing.T) {
+		cluster, cleanup := NewCluster(t, 5)
+		defer cleanup()
+
+		// Write something to the cluster
+		cluster.Set(t, "test", "initial value")
+		cluster.VerifyValue(t, "test", "initial value")
+
+		// Kill a minority of the nodes in the cluster.
+		minority := len(cluster) / 2
+		for i := 0; i < minority; i++ {
+			err := cluster[i].Stop()
+			assert.NoError(t, err)
+		}
+
+		// Make sure a new leader is elected.
+		cluster.VerifyLeader(t)
+
+		// Update the initial value
+		cluster.Set(t, "test", "new value")
+		cluster.VerifyValue(t, "test", "new value")
+	})
+
+	t.Run("majority failure", func(t *testing.T) {
+		cluster, cleanup := NewCluster(t, 5)
+		defer cleanup()
+
+		// Write something to the cluster
+		cluster.Set(t, "test", "initial value")
+		cluster.VerifyValue(t, "test", "initial value")
+
+		// Kill a majority of the nodes in the cluster.
+		minority := (len(cluster) / 2) + 1
+		for i := 0; i < minority; i++ {
+			err := cluster[i].Stop()
+			assert.NoError(t, err)
+		}
+
+		{
+			// Try to update the value
+			randomLiveNode := cluster.RandomNode()
+
+			txn, err := randomLiveNode.Begin()
+			assert.NoError(t, err)
+
+			err = txn.Set([]byte("test"), []byte("new value"))
+			assert.NoError(t, err)
+
+			err = txn.Commit()
+			assert.Error(t, err)
+		}
+
+		cluster.VerifyValue(t, "test", "initial value")
+	})
+}
+
+func TestJoin(t *testing.T) {
+	t.Run("join one node", func(t *testing.T) {
+		node1, cleanup1 := NewStore(t)
+		defer cleanup1()
+
+		// Start the second node and give it the first node
+		// address as a peer.
+		node2, cleanup2 := NewStore(t, node1.Address())
+		defer cleanup2()
+
+		// Turn the two nodes into a cluster.
+		cluster := TestCluster{node1, node2}
+
+		// Make sure that the two nodes agree on a leader
+		cluster.VerifyLeader(t)
+
+		// Set a value somewhere in the cluster.
+		cluster.Set(t, "test", "value")
+
+		// Make sure that both nodes have the same value
+		cluster.VerifyValue(t, "test", "value")
+	})
+
+	t.Run("join cluster", func(t *testing.T) {
+		initialCluster, cleanup1 := NewCluster(t, 3)
+		defer cleanup1()
+
+		// Join using a random node in the cluster.
+		newNode, cleanupNew := NewStore(t, initialCluster.RandomNode().Address())
+		defer cleanupNew()
+
+		cluster := append(initialCluster, newNode)
+
+		// Make sure that the two nodes agree on a leader
+		cluster.VerifyLeader(t)
+
+		// Set a value somewhere in the cluster.
+		cluster.Set(t, "test", "value")
+
+		// Make sure that both nodes have the same value
+		cluster.VerifyValue(t, "test", "value")
+	})
+}

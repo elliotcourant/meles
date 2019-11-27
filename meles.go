@@ -32,6 +32,10 @@ func NewStore(listener net.Listener, logger timber.Logger, options Options) (*St
 	}, nil
 }
 
+func (s *Store) Address() string {
+	return s.db.Address()
+}
+
 func (s *Store) Start() error {
 	return s.db.Start()
 }

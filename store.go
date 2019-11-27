@@ -107,6 +107,10 @@ func newDistributor(listener net.Listener, options *distOptions, l timber.Logger
 	return r, err
 }
 
+func (r *boat) Address() string {
+	return r.listenAddress
+}
+
 func (r *boat) Start() error {
 	r.runMasterServer()
 	r.runBoatServer()

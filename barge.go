@@ -21,6 +21,7 @@ type Decoder interface {
 }
 
 type barge interface {
+	Address() string
 	Start() error
 	WaitForLeader(timeout time.Duration) (string, bool, error)
 	IsLeader() bool
