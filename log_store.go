@@ -105,6 +105,10 @@ func (r raftLogStore) getPrefix() []byte {
 }
 
 func (r raftLogStore) getIndexForKey(key []byte) uint64 {
+	if len(key) == 0 {
+		return 0
+	}
+
 	k := key[len(r.getPrefix()):]
 	if len(k) == 8 {
 		return binary.BigEndian.Uint64(k)

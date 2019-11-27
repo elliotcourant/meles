@@ -104,7 +104,7 @@ func TestClustering(t *testing.T) {
 	})
 
 	t.Run("large", func(t *testing.T) {
-		cluster, cleanup := NewCluster(t, 32)
+		cluster, cleanup := NewCluster(t, 18)
 		defer cleanup()
 
 		cluster.Set(t, "test", "value")
