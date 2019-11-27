@@ -54,31 +54,31 @@ func (r *raftLogStore) StoreLogs(logs []*raft.Log) error {
 }
 
 func (r *raftLogStore) DeleteRange(min, max uint64) error {
-	return r.db.Update(func(txn *badger.Txn) error {
-		it := txn.NewIterator(badger.IteratorOptions{
-			PrefetchValues: false,
-		})
-		defer it.Close()
-		start := r.getKeyForIndex(min)
-		keys := make([][]byte, 0)
-
-		for it.Seek(start); it.Valid(); it.Next() {
-			k := make([]byte, 0)
-			it.Item().KeyCopy(k)
-			index := r.getIndexForKey(k)
-			if index > max {
-				break
-			}
-			keys = append(keys, k)
-		}
-
-		for _, key := range keys {
-			if err := txn.Delete(key); err != nil {
-				return err
-			}
-		}
-		return nil
+	txn := r.db.NewTransactionAt(uint64(time.Now().UnixNano()), true)
+	defer txn.Discard()
+	it := txn.NewIterator(badger.IteratorOptions{
+		PrefetchValues: false,
 	})
+	defer it.Close()
+	start := r.getKeyForIndex(min)
+	keys := make([][]byte, 0)
+
+	for it.Seek(start); it.Valid(); it.Next() {
+		k := make([]byte, 0)
+		it.Item().KeyCopy(k)
+		index := r.getIndexForKey(k)
+		if index > max {
+			break
+		}
+		keys = append(keys, k)
+	}
+
+	for _, key := range keys {
+		if err := txn.Delete(key); err != nil {
+			return err
+		}
+	}
+	return txn.CommitAt(uint64(time.Now().UnixNano()), nil)
 }
 
 func (r *raftLogStore) index(reverse bool) (val uint64, err error) {
