@@ -1,4 +1,4 @@
-# meles ([Badger (genus)](https://en.wikipedia.org/wiki/Meles_(genus\)))
+# meles ([Badger (genus)](https://en.wikipedia.org/wiki/Meles_(genus)))
 
 [![Build Status](https://travis-ci.com/elliotcourant/meles.svg?branch=master)](https://travis-ci.com/elliotcourant/meles)
 [![codecov](https://codecov.io/gh/elliotcourant/meles/branch/master/graph/badge.svg)](https://codecov.io/gh/elliotcourant/meles)
