@@ -24,8 +24,8 @@ github.com/dgryski/go-farm v0.0.0-20190423205320-6a90982ecee2 h1:tdlZCpZ/P9DhczC
 github.com/dgryski/go-farm v0.0.0-20190423205320-6a90982ecee2/go.mod h1:SqUrOPUnsFjfmXRMNPybcSiG0BgUW2AuFH8PAnS2iTw=
 github.com/dustin/go-humanize v1.0.0 h1:VSnTsYCnlFHaM2/igO1h6X3HA71jcobQuxemgkq4zYo=
 github.com/dustin/go-humanize v1.0.0/go.mod h1:HtrtbFcZ19U5GC7JDqmcUSB87Iq5E25KnS6fMYU6eOk=
-github.com/elliotcourant/buffers v0.0.0-20190811025309-24fdba97ca9b h1:hnBfbE6sWwWGpCiFwSWvzsOxxuEujfmk+xYr+a98pHc=
-github.com/elliotcourant/buffers v0.0.0-20190811025309-24fdba97ca9b/go.mod h1:9+oLElsEQnueTyoq0dyr6RiJwELNE+YtLXh4BNAsnKg=
+github.com/elliotcourant/buffers v0.0.0-20191201042100-3d9daf6f332b h1:35ZXu2t4bU1snDlC1BwLAZ7f425Pxz+abdRd9hhzflU=
+github.com/elliotcourant/buffers v0.0.0-20191201042100-3d9daf6f332b/go.mod h1:9+oLElsEQnueTyoq0dyr6RiJwELNE+YtLXh4BNAsnKg=
 github.com/elliotcourant/timber v0.0.0-20190831033938-85b1f62dde82 h1:rAx7YfNNnDIik1N7Zj/lQjt2b/5aejQLGQEc+v18t7M=
 github.com/elliotcourant/timber v0.0.0-20190831033938-85b1f62dde82/go.mod h1:Qt+GcRn3FBq5YMmfc+MtIgGyN4fq3lZaRNYDlkOeigg=
 github.com/fsnotify/fsnotify v1.4.7/go.mod h1:jwhsz4b93w/PPRr/qN1Yymfu8t87LnFCMoQvtojpjFo=

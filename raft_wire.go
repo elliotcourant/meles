@@ -153,7 +153,6 @@ type serverWireBase struct {
 }
 
 func (r *serverWireBase) Send(msg serverMessage) error {
-	// time.Sleep(time.Millisecond * 1)
 	_, err := r.w.Write(writeWireMessage(msg))
 	return err
 }
@@ -167,7 +166,7 @@ func (r *serverWireBase) Receive() (clientMessage, error) {
 
 		buf := buffers.NewBytesReader(header)
 		r.msgType = buf.NextUint8()
-		r.bodyLen = buf.NextInt32()
+		r.bodyLen = buf.NextInt32() - 4
 	}
 
 	msgBody, err := r.cr.Next(int(r.bodyLen))
@@ -251,7 +250,6 @@ func (r *clientWireBase) handshake(intention handshakeIntention) error {
 }
 
 func (r *clientWireBase) Send(msg clientMessage) error {
-	// time.Sleep(time.Millisecond * 1)
 	_, err := r.w.Write(writeWireMessage(msg))
 	return err
 }
@@ -265,7 +263,7 @@ func (r *clientWireBase) Receive() (serverMessage, error) {
 
 		buf := buffers.NewBytesReader(header)
 		r.msgType = buf.NextUint8()
-		r.bodyLen = buf.NextInt32()
+		r.bodyLen = buf.NextInt32() - 4
 	}
 
 	msgBody, err := r.cr.Next(int(r.bodyLen))
